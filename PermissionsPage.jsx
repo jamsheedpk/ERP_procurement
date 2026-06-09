@@ -319,7 +319,7 @@ function PermissionsPage() {
               <tr>
                 <th>User</th>
                 <th>System role</th>
-                <th>HRM role</th>
+                <th>ERP role</th>
                 <th>Status</th>
                 <th>Member since</th>
                 <th>Actions</th>

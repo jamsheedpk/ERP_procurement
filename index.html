@@ -2,12 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Meridian HRM — Admin</title>
+<title>Meridian ERP — Admin</title>
 <link rel="stylesheet" href="hrm.css" />
 <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
 <link rel="icon" href="assets/logo-mark.svg" type="image/svg+xml" />
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBwq37HvnCUs22Lpm2etp3X8LIr3QVZtdM&libraries=places" async defer></script>
 <script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
@@ -35,6 +37,7 @@
 <script type="text/babel" src="CashBookPage.jsx"></script>
 <script type="text/babel" src="DayBookPage.jsx"></script>
 <script type="text/babel" src="PartyPage.jsx"></script>
+<script type="text/babel" src="ProcurementPage.jsx"></script>
 <script type="text/babel" src="ProjectPage.jsx"></script>
 <script type="text/babel" src="QuotationPage.jsx"></script>
 <script type="text/babel" src="ProjectReportPage.jsx"></script>
@@ -62,28 +65,29 @@ const DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 const ROUTE_CRUMBS = {
-  dashboard: ["People & Culture", "Dashboard"],
-  people:    ["People & Culture", "Employees"],
-  org:       ["People & Culture", "Org chart"],
-  onboard:   ["People & Culture", "Onboarding"],
-  recruit:   ["People & Culture", "Recruitment"],
-  leave:     ["People & Culture", "Leave"],
-  attend:    ["People & Culture", "Attendance"],
-  shifts:    ["People & Culture", "Shifts"],
-  payroll:   ["People & Culture", "Payroll", "May 2026"],
-  benefits:  ["People & Culture", "Benefits"],
-  salary:    ["Money", "Salary"],
-  expense:   ["People & Culture", "Expenses"],
-  cashbook:  ["Finance", "Cash Book"],
-  daybook:   ["Finance", "Day Book"],
-  parties:   ["People & Culture", "Party"],
+  dashboard: ["Overview", "Dashboard"],
+  people:    ["HR", "Employees"],
+  org:       ["HR", "Org chart"],
+  onboard:   ["HR", "Onboarding"],
+  recruit:   ["HR", "Recruitment"],
+  docs:      ["HR", "Documents & Contracts"],
+  leave:     ["HR", "Leave"],
+  attend:    ["HR", "Attendance"],
+  shifts:    ["HR", "Shifts"],
+  payroll:   ["HR", "Payroll", "May 2026"],
+  salary:    ["HR", "Salary"],
+  benefits:  ["HR", "Benefits"],
+  perf:      ["HR", "Performance"],
+  learn:     ["HR", "Training"],
+  reports:   ["HR", "Reports"],
+  expense:   ["Accounting", "Expenses"],
+  cashbook:  ["Accounting", "Cash Book"],
+  daybook:   ["Accounting", "Day Book"],
+  parties:   ["Accounting", "Parties"],
+  procurement: ["Procurement", "Lifecycle"],
   projects:  ["Projects", "Pipeline"],
   quotations:["Projects", "Quotations"],
   projreport:["Projects", "P&L Report"],
-  perf:      ["People & Culture", "Performance"],
-  learn:     ["People & Culture", "Training"],
-  docs:        ["People & Culture", "Documents & Contracts"],
-  reports:     ["People & Culture", "Reports"],
   permissions: ["Settings", "Permissions & Roles"],
 };
 
@@ -214,7 +218,7 @@ function App() {
       setLoading(false);
     }).catch(err => {
       console.error("API error:", err);
-      setError("Could not connect to the HRM server. Make sure it is running on port 5000.");
+      setError("Could not connect to the ERP server. Make sure it is running on port 5000.");
       setLoading(false);
     });
   }, []);
@@ -251,7 +255,7 @@ function App() {
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", flexDirection: "column", gap: 14, color: "var(--fg-3)" }}>
       <div style={{ width: 36, height: 36, border: "3px solid var(--plum-100)", borderTopColor: "var(--brand-burgundy)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-      <div style={{ fontSize: 13 }}>Loading HRM data…</div>
+      <div style={{ fontSize: 13 }}>Loading ERP data…</div>
     </div>
   );
 
@@ -334,6 +338,7 @@ function App() {
   else if (route === "cashbook")    page = <CashBookPage />;
   else if (route === "daybook")     page = <DayBookPage />;
   else if (route === "parties")     page = <PartyPage />;
+  else if (route === "procurement") page = <ProcurementPage />;
   else if (route === "projects")    page = <ProjectPage />;
   else if (route === "quotations")  page = <QuotationPage />;
   else if (route === "projreport")  page = <ProjectReportPage />;
@@ -347,7 +352,7 @@ function App() {
     <div className="app" data-screen-label={"00 " + route}>
       <Sidebar current={route} onNav={(r) => { setRoute(r); setSelectedLeave(null); }} counts={counts} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(c => !c)} user={authUser} onLogout={handleLogout} />
       <main className="main">
-        <Topbar crumbs={ROUTE_CRUMBS[route] || ["HRM"]} onToggleSidebar={() => setSidebarCollapsed(c => !c)} />
+        <Topbar crumbs={ROUTE_CRUMBS[route] || ["ERP"]} onToggleSidebar={() => setSidebarCollapsed(c => !c)} />
         {page}
       </main>
 
@@ -416,7 +421,7 @@ function EmptyPage({ route, onNav }) {
         <div>
           <div className="eyebrow">Module</div>
           <h1 className="page-title">{labels[route] || route}</h1>
-          <div className="page-sub">This module is part of the HRM roadmap. Wired through the same data model, sidebar and chrome — ready to slot in.</div>
+          <div className="page-sub">This module is part of the ERP roadmap. Wired through the same data model, sidebar and chrome — ready to slot in.</div>
         </div>
         <Button variant="ghost" onClick={() => onNav("dashboard")} icon="arrow-left">Back to dashboard</Button>
       </div>

@@ -37,6 +37,7 @@ app.use("/api/expenses",       require("./backend/routes/expenses"));
 app.use("/api/cashbook",       require("./backend/routes/cashbook"));
 app.use("/api/daybook",        require("./backend/routes/daybook"));
 app.use("/api/parties",        require("./backend/routes/parties"));
+app.use("/api/procurement",    require("./backend/routes/procurement"));
 app.use("/api/projects",       require("./backend/routes/projects"));
 app.use("/api/quotations",     require("./backend/routes/quotations"));
 app.use("/api/reports",        require("./backend/routes/projectReports"));

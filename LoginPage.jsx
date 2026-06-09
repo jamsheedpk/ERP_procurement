@@ -38,15 +38,15 @@ function LoginPage({ onLogin }) {
           <div className="login-logo">
             <div className="login-logo-mark">M</div>
           </div>
-          <div className="login-brand-name">Meridian HRM</div>
-          <div className="login-brand-sub">Human Resources Platform</div>
+          <div className="login-brand-name">Meridian ERP</div>
+          <div className="login-brand-sub">Enterprise Resource Platform</div>
 
           <div className="login-features">
             {[
-              ["users",        "Employee directory & profiles"],
-              ["calendar-off", "Leave management & approvals"],
-              ["user-plus",    "Recruitment pipeline"],
+              ["users",        "Employee directory & HR"],
               ["wallet",       "Payroll & WPS filing"],
+              ["book-open",    "Finance & accounting"],
+              ["kanban",       "Projects & quotations"],
             ].map(([icon, label]) => (
               <div key={icon} className="login-feature-item">
                 <div className="login-feature-icon">
@@ -68,7 +68,7 @@ function LoginPage({ onLogin }) {
         <form className="login-card" onSubmit={handleSubmit} noValidate>
           <div className="login-card-head">
             <div className="login-card-title">Welcome back</div>
-            <div className="login-card-sub">Sign in to your HRM account</div>
+            <div className="login-card-sub">Sign in to your ERP account</div>
           </div>
 
           <div className="stack" style={{ gap: 14 }}>

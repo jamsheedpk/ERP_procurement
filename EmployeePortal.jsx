@@ -121,7 +121,7 @@ function EmployeePortal({ authUser, token, onLogout }) {
         <div className="ep-sidebar-brand">
           <div className="ep-sidebar-mark">M</div>
           <div>
-            <div className="ep-sidebar-name">Meridian HRM</div>
+            <div className="ep-sidebar-name">Meridian ERP</div>
             <div className="ep-sidebar-sub">Employee Portal</div>
           </div>
         </div>
