@@ -1197,7 +1197,7 @@ function SkeletonRow() {
 }
 
 /* ── Main Page ───────────────────────────────────────────────────── */
-function QuotationPage() {
+function QuotationPage(props) {
   var API = window.API || "http://localhost:5000/api";
 
   var stateQuotations   = useStateQ([]);   var quotations = stateQuotations[0];   var setQuotations = stateQuotations[1];
@@ -1301,6 +1301,27 @@ function QuotationPage() {
 
   function handlePrint() {
     if (selected) printQuotation(selected);
+  }
+
+  function handleConvert(quotationId) {
+    var q = quotations.filter(function(x) { return x.quotationId === quotationId; })[0];
+    if (q && q.invoiceId) { alert("Already invoiced as " + q.invoiceId); return; }
+    if (!window.confirm("Convert this quotation to an invoice?")) return;
+    fetch(API + "/invoices/from-quotation/" + quotationId, { method: "POST" })
+      .then(function(r) { return r.json(); })
+      .then(function(inv) {
+        if (inv.error) { alert("Convert failed: " + inv.error); return; }
+        setQuotations(quotations.map(function(x) {
+          return x.quotationId === quotationId ? Object.assign({}, x, { invoiceId: inv.invoiceId }) : x;
+        }));
+        if (selected && selected.quotationId === quotationId) {
+          setSelected(Object.assign({}, selected, { invoiceId: inv.invoiceId }));
+        }
+        if (props.onNav && window.confirm("Invoice " + inv.invoiceId + " created. Open Invoices now?")) {
+          props.onNav("invoices");
+        }
+      })
+      .catch(function(err) { alert("Convert failed: " + err.message); });
   }
 
   function openNew() {
@@ -1437,29 +1458,32 @@ function QuotationPage() {
                       <td style={{ padding: "10px 14px" }}><StatusBadge status={q.status || "draft"} /></td>
                       <td style={{ padding: "10px 12px" }}>
                         <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }} onClick={function(e) { e.stopPropagation(); }}>
-                          {/* Quick status actions */}
-                          {q.status === "draft" && (
-                            <button className="pill-btn" style={{ fontSize: 11, padding: "3px 8px", background: "#EFF6FF", color: "#2563B0", border: "1px solid #BFDBFE" }} type="button"
-                              onClick={function(id) { return function() { handleStatusChange(id, "sent"); }; }(q.quotationId)}>
-                              Send
+                          {/* Free status change — set any status, including back to Draft */}
+                          <select
+                            value={q.status || "draft"}
+                            title="Change status"
+                            style={{ fontSize: 11, fontWeight: 600, padding: "3px 6px", borderRadius: 5, cursor: "pointer",
+                              border: "1px solid " + (QUO_STATUS[q.status || "draft"].color) + "55",
+                              background: QUO_STATUS[q.status || "draft"].bg,
+                              color: QUO_STATUS[q.status || "draft"].color }}
+                            onChange={function(id) { return function(e) { handleStatusChange(id, e.target.value); }; }(q.quotationId)}
+                          >
+                            {Object.keys(QUO_STATUS).map(function(s) {
+                              return <option key={s} value={s} style={{ color: "var(--fg-1)", background: "var(--bg-1)" }}>{QUO_STATUS[s].label}</option>;
+                            })}
+                          </select>
+                          {/* Convert to invoice (or show the linked invoice) */}
+                          {q.invoiceId ? (
+                            <button className="pill-btn" type="button" title={"Invoiced as " + q.invoiceId}
+                              style={{ fontSize: 11, padding: "3px 8px", background: "#ECFDF5", color: "#1F8A52", border: "1px solid #A7F3D0" }}
+                              onClick={function() { if (props.onNav) props.onNav("invoices"); }}>
+                              <Icon name="receipt" size={11} /> Invoiced
                             </button>
-                          )}
-                          {q.status === "sent" && (
-                            <>
-                              <button className="pill-btn" style={{ fontSize: 11, padding: "3px 8px", background: "#ECFDF5", color: "#1F8A52", border: "1px solid #A7F3D0" }} type="button"
-                                onClick={function(id) { return function() { handleStatusChange(id, "approved"); }; }(q.quotationId)}>
-                                Approve
-                              </button>
-                              <button className="pill-btn" style={{ fontSize: 11, padding: "3px 8px", background: "#FFF1F2", color: "#C0263A", border: "1px solid #FECDD3" }} type="button"
-                                onClick={function(id) { return function() { handleStatusChange(id, "rejected"); }; }(q.quotationId)}>
-                                Reject
-                              </button>
-                            </>
-                          )}
-                          {(q.status === "approved" || q.status === "rejected") && (
-                            <button className="pill-btn" style={{ fontSize: 11, padding: "3px 8px", background: "#FEF3C7", color: "#D78A14", border: "1px solid #FDE68A" }} type="button"
-                              onClick={function(id) { return function() { handleStatusChange(id, "expired"); }; }(q.quotationId)}>
-                              Archive
+                          ) : (
+                            <button className="pill-btn" type="button" title="Convert to invoice"
+                              style={{ fontSize: 11, padding: "3px 8px", background: "#EEF2FF", color: "#534AB7", border: "1px solid #C7D2FE" }}
+                              onClick={function(id) { return function() { handleConvert(id); }; }(q.quotationId)}>
+                              <Icon name="file-text" size={11} /> Invoice
                             </button>
                           )}
                           {/* View / Edit / Delete */}

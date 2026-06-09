@@ -92,9 +92,10 @@ function TxnBreakdown(props) {
       {/* Income vs cost summary */}
       <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 16 }}>
         {[
-          { label: "Cash Receipts",  value: row.receipts,   color: "#1F8A52" },
-          { label: "Day Book Credit",value: row.dayCredits, color: "#1F8A52" },
-          { label: "Total Income",   value: row.totalIncome,color: "#1F8A52", bold: true },
+          { label: "Cash Receipts",  value: row.receipts,         color: "#1F8A52" },
+          { label: "Day Book Credit",value: row.dayCredits,       color: "#1F8A52" },
+          { label: "Invoice Payments",value: row.invoiceCollected,color: "#1F8A52" },
+          { label: "Total Income",   value: row.totalIncome,      color: "#1F8A52", bold: true },
           { label: "Expenses",       value: row.expenses,   color: "#C0263A" },
           { label: "Cash Payments",  value: row.payments,   color: "#C0263A" },
           { label: "Day Book Debit", value: row.dayDebits,  color: "#C0263A" },
@@ -255,11 +256,24 @@ function ProjectReportPage() {
         <div>
           <div className="eyebrow">Projects</div>
           <h1 className="page-title">Project P&amp;L Report</h1>
-          <div className="page-sub">Profit &amp; loss per project across expenses, cash book &amp; day book</div>
+          <div className="page-sub">Profit &amp; loss per project across invoices, expenses, cash book &amp; day book</div>
         </div>
         <div className="row">
           <Button variant="secondary" icon="download" onClick={exportCSV}>Export CSV</Button>
         </div>
+      </div>
+
+      {/* Methodology note */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 14px", marginBottom: 18,
+        background: "var(--ink-50)", border: "1px solid var(--border-subtle)", borderRadius: 10,
+        fontSize: 11.5, color: "var(--fg-3)", lineHeight: 1.5 }}>
+        <Icon name="info" size={14} color="var(--fg-3)" style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>
+          <strong>Income</strong> = Cash Book receipts + Day Book credits + Invoice payments collected.&nbsp;
+          <strong>Cost</strong> = Expenses (excl. rejected) + Cash Book payments + Day Book debits.&nbsp;
+          <strong>Margin</strong> = Net ÷ contract value.
+          Record each transaction in <strong>only one</strong> place (Invoice, Expense, Cash Book or Day Book) — the same amount entered twice is counted twice.
+        </span>
       </div>
 
       {/* KPI strip */}
@@ -377,7 +391,7 @@ function ProjectReportPage() {
                           fontSize: 11.5, fontWeight: 700, padding: "2px 8px", borderRadius: 5,
                           background: isProfit ? "#ECFDF5" : "#FFF1F2", color: isProfit ? "#1F8A52" : "#C0263A" }}>
                           <Icon name={isProfit ? "arrow-up-right" : "arrow-down-right"} size={11} color={isProfit ? "#1F8A52" : "#C0263A"} />
-                          {r.margin.toFixed(0)}%
+                          {(Math.abs(r.margin) < 10 ? r.margin.toFixed(1) : r.margin.toFixed(0))}%
                         </span>
                       )}
                     </td>

@@ -116,7 +116,7 @@ const lowestVendorIdx = totals => {
 };
 
 const BLANK_PROC = {
-  title: "", department: "Operations", vendor: "", projectName: "",
+  title: "", department: "Operations", vendor: "", projectId: "", projectName: "",
   raisedBy: "", priority: "normal", estValue: "", description: "",
 };
 
@@ -192,6 +192,56 @@ function EmployeeSelect({ value, onChange }) {
   );
 }
 
+// ── Project dropdown — sourced from already-created Projects ────────────────────
+// Named ProcProjectSelect to avoid clashing with the shared ProjectSelect in
+// Primitives.jsx (party-filtered, used by Expenses) — all .jsx share one global scope.
+function ProcProjectSelect({ value, name, onChange }) {
+  const [projects, setProjects] = useStatePR(window._projectCache || []);
+  const [loading, setLoading]   = useStatePR(!window._projectCache);
+
+  useEffectPR(() => {
+    if (window._projectCache) return;
+    fetch(`${window.API}/projects`)
+      .then(r => r.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : [];
+        window._projectCache = list;
+        setProjects(list);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  // Preserve a previously-linked project even if it's not in the fetched list.
+  const known = projects.some(p => p.projectId === value);
+
+  return (
+    <>
+      <select
+        className="form-input"
+        value={value || ""}
+        onChange={e => {
+          const p = projects.find(x => x.projectId === e.target.value);
+          onChange({ projectId: e.target.value, projectName: p ? p.title : "" });
+        }}
+      >
+        <option value="">{loading ? "Loading projects…" : "— No linked project —"}</option>
+        {value && !known && <option value={value}>{name || value}</option>}
+        {projects.map(p => (
+          <option key={p.projectId} value={p.projectId}>
+            {p.title}{p.partyName ? " — " + p.partyName : ""}
+          </option>
+        ))}
+      </select>
+      {!loading && projects.length === 0 && (
+        <div style={{ fontSize: 11, color: "var(--fg-4)", marginTop: 4 }}>
+          No projects yet — add them under Projects.
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── Create / Edit modal ─────────────────────────────────────────────────────────
 function ProcurementFormModal({ initial, onClose, onSave }) {
   const [form, setForm]   = useStatePR(initial || BLANK_PROC);
@@ -253,7 +303,11 @@ function ProcurementFormModal({ initial, onClose, onSave }) {
 
           <div className="form-row">
             <label className="form-label">Linked Project (optional)</label>
-            <input className="form-input" placeholder="Project name / reference" value={form.projectName} onChange={set("projectName")} />
+            <ProcProjectSelect
+              value={form.projectId}
+              name={form.projectName}
+              onChange={({ projectId, projectName }) => setForm(p => ({ ...p, projectId, projectName }))}
+            />
           </div>
 
           <div className="form-row">
@@ -1688,6 +1742,28 @@ function PaymentAppPage({ proc, onBack, onSave, onIssuePOs }) {
 function ProcDetailPane({ proc, onClose, onEdit, onDelete, onAdvance, onSetStage, onManageItems, onCompareQuotes, onManagePOs, onManagePayApps, onSetStatus }) {
   const curIdx = stageIndex(proc.currentStage);
   const st = STATUS_META[proc.status] || STATUS_META.in_progress;
+
+  // Finance records booked against the same project (shown when linked):
+  // expense claims, cash book entries and day book entries.
+  const [expenses, setExpenses] = useStatePR([]);
+  const [cashEntries, setCashEntries] = useStatePR([]);
+  const [dayEntries, setDayEntries] = useStatePR([]);
+  useEffectPR(() => {
+    if (!proc.projectId) { setExpenses([]); setCashEntries([]); setDayEntries([]); return; }
+    const pid = encodeURIComponent(proc.projectId);
+    fetch(`${window.API}/expenses?projectId=${pid}`).then(r => r.json())
+      .then(d => setExpenses(Array.isArray(d) ? d : [])).catch(() => setExpenses([]));
+    fetch(`${window.API}/cashbook?projectId=${pid}`).then(r => r.json())
+      .then(d => setCashEntries(Array.isArray(d) ? d : [])).catch(() => setCashEntries([]));
+    fetch(`${window.API}/daybook?projectId=${pid}`).then(r => r.json())
+      .then(d => setDayEntries(Array.isArray(d) ? d : [])).catch(() => setDayEntries([]));
+  }, [proc.projectId]);
+  const expenseTotal = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const EXP_STATUS_COLORS = { pending: "#D78A14", approved: "#2563B0", reimbursed: "#1F8A52", rejected: "#C0263A" };
+  const cashReceipts = cashEntries.filter(e => e.entryType === "receipt").reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const cashPayments = cashEntries.filter(e => e.entryType === "payment").reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const dayDebit  = dayEntries.reduce((s, e) => s + (Number(e.debit) || 0), 0);
+  const dayCredit = dayEntries.reduce((s, e) => s + (Number(e.credit) || 0), 0);
   const histByStage = (proc.history || []).reduce((m, h) => { m[h.stage] = h; return m; }, {});
   const isDone = proc.status === "completed";
   const items = proc.items || [];
@@ -1741,6 +1817,133 @@ function ProcDetailPane({ proc, onClose, onEdit, onDelete, onAdvance, onSetStage
           </div>
         ))}
       </div>
+
+      {/* Linked project & quotation (from the originating Project) */}
+      {(proc.projectId || proc.quotationRef) && (
+        <div style={{ marginBottom: 18, padding: "12px 14px", border: "1px solid var(--border-subtle)", borderRadius: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em",
+            color: "var(--fg-3)", display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+            <Icon name="file-text" size={13} /> Linked Project &amp; Quotation
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {[
+              ["Project", proc.projectName || proc.projectId || "—"],
+              ["Quotation Ref", proc.quotationRef || "—"],
+              ["Quotation Amount", proc.quotationAmount ? AED(proc.quotationAmount) : "—"],
+              ["Quotation Date", proc.quotationDate || "—"],
+            ].map(([l, v]) => (
+              <div key={l} style={{ padding: "8px 10px", background: "var(--ink-50)", borderRadius: 8 }}>
+                <div style={{ fontSize: 10, color: "var(--fg-3)", textTransform: "uppercase", letterSpacing: ".05em" }}>{l}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)", marginTop: 2, wordBreak: "break-word" }}>{v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Expense claims booked against the linked project */}
+      {proc.projectId && expenses.length > 0 && (
+        <div style={{ marginBottom: 18, padding: "12px 14px", border: "1px solid var(--border-subtle)", borderRadius: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em",
+              color: "var(--fg-3)", display: "flex", alignItems: "center", gap: 6 }}>
+              <Icon name="receipt" size={13} /> Expense Claims
+              <span style={{ color: "var(--fg-4)" }}>· {expenses.length}</span>
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#1F8A52" }}>{AED(expenseTotal)}</span>
+          </div>
+          {expenses.map(e => {
+            const c = EXP_STATUS_COLORS[e.status] || "#A89DA3";
+            return (
+              <div key={e.expenseId} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0",
+                borderTop: "1px solid var(--border-subtle)" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)", whiteSpace: "nowrap",
+                    overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {e.desc || e.cat || "Expense"}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: "var(--fg-3)", marginTop: 1 }}>
+                    {e.date}{e.empName ? " · " + e.empName : ""}{e.cat ? " · " + e.cat : ""}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--fg-1)", whiteSpace: "nowrap" }}>{AED(e.amount)}</div>
+                  <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", color: c }}>{e.status}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Cash Book entries booked against the linked project */}
+      {proc.projectId && cashEntries.length > 0 && (
+        <div style={{ marginBottom: 18, padding: "12px 14px", border: "1px solid var(--border-subtle)", borderRadius: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em",
+              color: "var(--fg-3)", display: "flex", alignItems: "center", gap: 6 }}>
+              <Icon name="wallet" size={13} /> Cash Book
+              <span style={{ color: "var(--fg-4)" }}>· {cashEntries.length}</span>
+            </div>
+            <div style={{ display: "flex", gap: 10, fontSize: 11, fontWeight: 700 }}>
+              <span style={{ color: "#1F8A52" }} title="Receipts">▲ {AED(cashReceipts)}</span>
+              <span style={{ color: "#C0263A" }} title="Payments">▼ {AED(cashPayments)}</span>
+            </div>
+          </div>
+          {cashEntries.map(e => (
+            <div key={e.entryId} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0",
+              borderTop: "1px solid var(--border-subtle)" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)", whiteSpace: "nowrap",
+                  overflow: "hidden", textOverflow: "ellipsis" }}>{e.description || e.category || "Entry"}</div>
+                <div style={{ fontSize: 10.5, color: "var(--fg-3)", marginTop: 1 }}>
+                  {e.date}{e.category ? " · " + e.category : ""}{e.paymentMode ? " · " + e.paymentMode : ""}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap",
+                  color: e.entryType === "receipt" ? "#1F8A52" : "#C0263A" }}>
+                  {e.entryType === "receipt" ? "+" : "−"}{AED(e.amount)}
+                </div>
+                <span style={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", color: "var(--fg-3)" }}>{e.entryType}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Day Book entries booked against the linked project */}
+      {proc.projectId && dayEntries.length > 0 && (
+        <div style={{ marginBottom: 18, padding: "12px 14px", border: "1px solid var(--border-subtle)", borderRadius: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em",
+              color: "var(--fg-3)", display: "flex", alignItems: "center", gap: 6 }}>
+              <Icon name="book-open" size={13} /> Day Book
+              <span style={{ color: "var(--fg-4)" }}>· {dayEntries.length}</span>
+            </div>
+            <div style={{ display: "flex", gap: 10, fontSize: 11, fontWeight: 700 }}>
+              <span style={{ color: "#C0263A" }} title="Debit">Dr {AED(dayDebit)}</span>
+              <span style={{ color: "#1F8A52" }} title="Credit">Cr {AED(dayCredit)}</span>
+            </div>
+          </div>
+          {dayEntries.map(e => (
+            <div key={e.entryId} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0",
+              borderTop: "1px solid var(--border-subtle)" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)", whiteSpace: "nowrap",
+                  overflow: "hidden", textOverflow: "ellipsis" }}>{e.description || e.account || "Entry"}</div>
+                <div style={{ fontSize: 10.5, color: "var(--fg-3)", marginTop: 1 }}>
+                  {e.date}{e.account ? " · " + e.account : ""}{e.entryType ? " · " + e.entryType : ""}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                {e.debit > 0 && <div style={{ fontSize: 12, fontWeight: 700, color: "#C0263A", whiteSpace: "nowrap" }}>Dr {AED(e.debit)}</div>}
+                {e.credit > 0 && <div style={{ fontSize: 12, fontWeight: 700, color: "#1F8A52", whiteSpace: "nowrap" }}>Cr {AED(e.credit)}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Material & Labour list summary */}
       <div style={{ marginBottom: 18, padding: "12px 14px", border: "1px solid var(--border-subtle)", borderRadius: 10 }}>

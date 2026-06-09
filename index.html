@@ -40,6 +40,7 @@
 <script type="text/babel" src="ProcurementPage.jsx"></script>
 <script type="text/babel" src="ProjectPage.jsx"></script>
 <script type="text/babel" src="QuotationPage.jsx"></script>
+<script type="text/babel" src="InvoicePage.jsx"></script>
 <script type="text/babel" src="ProjectReportPage.jsx"></script>
 <script type="text/babel" src="PerformancePage.jsx"></script>
 <script type="text/babel" src="TrainingPage.jsx"></script>
@@ -87,6 +88,7 @@ const ROUTE_CRUMBS = {
   procurement: ["Procurement", "Lifecycle"],
   projects:  ["Projects", "Pipeline"],
   quotations:["Projects", "Quotations"],
+  invoices:  ["Projects", "Invoices"],
   projreport:["Projects", "P&L Report"],
   permissions: ["Settings", "Permissions & Roles"],
 };
@@ -340,7 +342,8 @@ function App() {
   else if (route === "parties")     page = <PartyPage />;
   else if (route === "procurement") page = <ProcurementPage />;
   else if (route === "projects")    page = <ProjectPage />;
-  else if (route === "quotations")  page = <QuotationPage />;
+  else if (route === "quotations")  page = <QuotationPage onNav={setRoute} />;
+  else if (route === "invoices")    page = <InvoicePage onNav={setRoute} />;
   else if (route === "projreport")  page = <ProjectReportPage />;
   else if (route === "perf")        page = <PerformancePage data={DATA} />;
   else if (route === "learn")       page = <TrainingPage data={DATA} />;

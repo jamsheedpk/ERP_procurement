@@ -112,6 +112,11 @@ const procurementSchema = new mongoose.Schema({
   priority:     { type: String, enum: ["low", "normal", "high", "urgent"], default: "normal" },
   estValue:     { type: Number, default: 0 },
 
+  // Customer quotation linked from the originating Project (snapshot).
+  quotationRef:    { type: String, default: "" },
+  quotationDate:   { type: String, default: "" },
+  quotationAmount: { type: Number, default: 0 },
+
   currentStage: { type: String, enum: STAGE_KEYS, default: "enquiry" },
   status:       { type: String, enum: ["in_progress", "completed", "on_hold", "cancelled"], default: "in_progress" },
 

@@ -11,15 +11,15 @@ const lineItemSchema = new mongoose.Schema({
   notes:      { type: String, default: "" },
 }, { _id: false });
 
-const quotationSchema = new mongoose.Schema({
-  quotationId:   { type: String, required: true, unique: true },
+const invoiceSchema = new mongoose.Schema({
+  invoiceId:     { type: String, required: true, unique: true },
+  quotationId:   { type: String, default: "" },   // source quotation, if converted
   projectId:     { type: String, default: "" },
   projectName:   { type: String, default: "" },
   partyId:       { type: String, default: "" },
   partyName:     { type: String, default: "" },
-  projectType:   { type: String, enum: ["house","villa","office","tower","museum","mall","hotel","infrastructure","renovation","city_space","transport","park","other"], default: "other" },
-  date:          { type: String, default: "" },
-  validUntil:    { type: String, default: "" },
+  date:          { type: String, default: "" },   // issue date
+  dueDate:       { type: String, default: "" },
   reference:     { type: String, default: "" },
   clientName:    { type: String, default: "" },
   clientAddress: { type: String, default: "" },
@@ -29,7 +29,6 @@ const quotationSchema = new mongoose.Schema({
   location:      { type: String, default: "" },
   introduction:  { type: String, default: "" },
   scopeOfWork:   { type: String, default: "" },
-  exclusions:    { type: String, default: "" },
   items:         [lineItemSchema],
   subtotal:      { type: Number, default: 0 },
   discountPct:   { type: Number, default: 0 },
@@ -37,13 +36,12 @@ const quotationSchema = new mongoose.Schema({
   taxPct:        { type: Number, default: 5 },
   taxAmt:        { type: Number, default: 0 },
   grandTotal:    { type: Number, default: 0 },
-  paymentTerms:  { type: String, default: "30% advance, 40% at 50% completion, 30% on delivery" },
-  deliveryTerms: { type: String, default: "" },
-  validityDays:  { type: Number, default: 30 },
-  currency:      { type: String, default: "AED" },
-  status:        { type: String, enum: ["draft","sent","approved","rejected","expired"], default: "draft" },
-  invoiceId:     { type: String, default: "" },   // set once converted to an invoice
+  amountPaid:    { type: Number, default: 0 },
+  balanceDue:    { type: Number, default: 0 },
+  paymentTerms:  { type: String, default: "" },
   notes:         { type: String, default: "" },
+  currency:      { type: String, default: "AED" },
+  status:        { type: String, enum: ["unpaid","partial","paid","overdue","cancelled"], default: "unpaid" },
 }, { timestamps: true });
 
-module.exports = mongoose.model("Quotation", quotationSchema);
+module.exports = mongoose.model("Invoice", invoiceSchema);

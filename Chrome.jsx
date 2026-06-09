@@ -37,6 +37,7 @@ function Sidebar({ current, onNav, counts = {}, brandName = "Meridian ERP", coll
     { sec: "Projects", icon: "kanban", items: [
       { id: "projects",   label: "Pipeline",   icon: "kanban" },
       { id: "quotations", label: "Quotations", icon: "file-text" },
+      { id: "invoices",   label: "Invoices",   icon: "receipt" },
       { id: "projreport", label: "P&L Report",  icon: "file-bar-chart" },
     ]},
     { sec: "Settings", icon: "settings", items: [

@@ -8,6 +8,7 @@ router.get("/", async (req, res) => {
     const filter = {};
     if (req.query.type) filter.entryType   = req.query.type;
     if (req.query.mode) filter.paymentMode = req.query.mode;
+    if (req.query.projectId) filter.projectId = req.query.projectId;
     if (req.query.from || req.query.to) {
       filter.date = {};
       if (req.query.from) filter.date.$gte = req.query.from;

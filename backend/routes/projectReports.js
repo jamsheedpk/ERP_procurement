@@ -4,20 +4,33 @@ const Project  = require("../models/Project");
 const Expense  = require("../models/Expense");
 const CashBook = require("../models/CashBook");
 const DayBook  = require("../models/DayBook");
+const Invoice  = require("../models/Invoice");
 
 // GET /api/reports/project-pnl
 // Per-project profit / loss aggregated across Expenses, Cash Book and Day Book.
 //
-// Income (money in)  = Cash Book receipts + Day Book credits
+// Income (money in)  = Cash Book receipts + Day Book credits + Invoice payments collected
 // Cost (money out)   = Expenses (not rejected) + Cash Book payments + Day Book debits
 // Net Profit / Loss  = Income - Cost
+// Margin             = Net Profit / Contract Value  (true profitability vs. the deal)
+//
+// Invoices contribute their AMOUNT PAID (cash collected), excluding cancelled
+// invoices — consistent with the cash-basis income above.
+//
+// NOTE ON DOUBLE COUNTING: income and cost are summed across three independent
+// ledgers (Expenses, Cash Book, Day Book). A single real-world transaction must
+// be entered in ONLY ONE of them — e.g. record a material payment either as an
+// Expense claim OR a Cash Book payment OR a Day Book debit, never in two. There
+// is no de-duplication here, so entering the same amount in multiple modules
+// will overstate cost (or income) for that project.
 router.get("/project-pnl", async (req, res) => {
   try {
-    const [projects, expenses, cashbook, daybook] = await Promise.all([
+    const [projects, expenses, cashbook, daybook, invoices] = await Promise.all([
       Project.find({}).sort({ createdAt: -1 }),
       Expense.find({}),
       CashBook.find({}),
       DayBook.find({}),
+      Invoice.find({}),
     ]);
 
     // Seed a row for every project
@@ -37,6 +50,7 @@ router.get("/project-pnl", async (req, res) => {
         // money in
         receipts:        0,   // cash book receipts
         dayCredits:      0,   // day book credits
+        invoiceCollected:0,   // invoice payments collected (amount paid)
         // money out
         expenses:        0,   // expense module
         payments:        0,   // cash book payments
@@ -46,6 +60,7 @@ router.get("/project-pnl", async (req, res) => {
         receiptCount:    0,
         paymentCount:    0,
         dayCount:        0,
+        invoiceCount:    0,
       };
     }
 
@@ -90,12 +105,24 @@ router.get("/project-pnl", async (req, res) => {
       r.dayCount   += 1;
     });
 
+    // Invoices — amount collected (in), cancelled excluded
+    invoices.forEach((inv) => {
+      if (!inv.projectId) return;
+      if (inv.status === "cancelled") return;
+      const r = ensure(inv.projectId, inv.projectName);
+      r.invoiceCollected += inv.amountPaid || 0;
+      r.invoiceCount += 1;
+    });
+
     // Finalise computed totals
     const list = Object.values(rows).map((r) => {
-      const totalIncome = r.receipts + r.dayCredits;
+      const totalIncome = r.receipts + r.dayCredits + r.invoiceCollected;
       const totalCost   = r.expenses + r.payments + r.dayDebits;
       const netProfit   = totalIncome - totalCost;
-      const margin      = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
+      // Margin is measured against the project's contract value (approved, else
+      // quotation) so it reflects true profitability even before cash is
+      // collected. Falls back to 0 when there is no contract value yet.
+      const margin      = r.contractValue > 0 ? (netProfit / r.contractValue) * 100 : 0;
       return Object.assign(r, {
         totalIncome:  totalIncome,
         totalCost:    totalCost,
@@ -127,9 +154,10 @@ router.get("/project-pnl", async (req, res) => {
         g.expenses    += r.expenses;
         g.dayCredits  += r.dayCredits;
         g.dayDebits   += r.dayDebits;
+        g.invoiceCollected += r.invoiceCollected;
         return g;
       },
-      { totalIncome: 0, totalCost: 0, netProfit: 0, receipts: 0, payments: 0, expenses: 0, dayCredits: 0, dayDebits: 0 }
+      { totalIncome: 0, totalCost: 0, netProfit: 0, receipts: 0, payments: 0, expenses: 0, dayCredits: 0, dayDebits: 0, invoiceCollected: 0 }
     );
 
     res.json({ rows: filtered, grand: grand });
@@ -142,11 +170,12 @@ router.get("/project-pnl", async (req, res) => {
 router.get("/project-pnl/:projectId", async (req, res) => {
   try {
     const pid = req.params.projectId;
-    const [project, expenses, cashbook, daybook] = await Promise.all([
+    const [project, expenses, cashbook, daybook, invoices] = await Promise.all([
       Project.findOne({ projectId: pid }),
       Expense.find({ projectId: pid }),
       CashBook.find({ projectId: pid }),
       DayBook.find({ projectId: pid }),
+      Invoice.find({ projectId: pid }),
     ]);
 
     const transactions = [];
@@ -169,6 +198,15 @@ router.get("/project-pnl/:projectId", async (req, res) => {
     daybook.forEach((d) => {
       if (d.credit > 0) transactions.push({ source: "daybook", date: d.date, description: d.description || "", ref: d.reference || d.entryId, party: d.party || "", direction: "in",  amount: d.credit, account: d.account || "" });
       if (d.debit  > 0) transactions.push({ source: "daybook", date: d.date, description: d.description || "", ref: d.reference || d.entryId, party: d.party || "", direction: "out", amount: d.debit,  account: d.account || "" });
+    });
+    invoices.forEach((inv) => {
+      if (inv.status === "cancelled") return;
+      if ((inv.amountPaid || 0) <= 0) return;
+      transactions.push({
+        source: "invoice", date: inv.date, description: "Invoice payment" + (inv.projectTitle ? " — " + inv.projectTitle : ""),
+        ref: inv.invoiceId, party: inv.clientName || inv.partyName || "",
+        direction: "in", amount: inv.amountPaid || 0, status: inv.status,
+      });
     });
 
     transactions.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));

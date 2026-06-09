@@ -40,6 +40,7 @@ app.use("/api/parties",        require("./backend/routes/parties"));
 app.use("/api/procurement",    require("./backend/routes/procurement"));
 app.use("/api/projects",       require("./backend/routes/projects"));
 app.use("/api/quotations",     require("./backend/routes/quotations"));
+app.use("/api/invoices",       require("./backend/routes/invoices"));
 app.use("/api/reports",        require("./backend/routes/projectReports"));
 app.use("/api/review-cycles", require("./backend/routes/reviewCycles"));
 app.use("/api/appraisals",    require("./backend/routes/appraisals"));

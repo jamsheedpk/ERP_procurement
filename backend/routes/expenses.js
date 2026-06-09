@@ -36,6 +36,7 @@ router.get("/", async (req, res) => {
     if (req.query.status) filter.status = req.query.status;
     if (req.query.cat)    filter.cat    = req.query.cat;
     if (req.query.empId)  filter.empId  = req.query.empId;
+    if (req.query.projectId) filter.projectId = req.query.projectId;
     if (req.query.month)  filter.date   = { $regex: `^${req.query.month}` };
     const docs = await Expense.find(filter).sort({ date: -1, createdAt: -1 });
     res.json(docs);

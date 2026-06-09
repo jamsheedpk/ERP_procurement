@@ -7,6 +7,7 @@ router.get("/", async (req, res) => {
   try {
     const filter = {};
     if (req.query.type) filter.entryType = req.query.type;
+    if (req.query.projectId) filter.projectId = req.query.projectId;
     if (req.query.date) {
       filter.date = req.query.date;
     } else if (req.query.from || req.query.to) {
