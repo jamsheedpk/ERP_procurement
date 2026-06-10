@@ -1,0 +1,47 @@
+/* Base design tokens shared by the shell and every remote. A trimmed port of the
+   monolith's hrm.css / colors_and_type.css variables — enough for the migrated
+   modules to render consistently. applyTheme() overrides the brand-* vars at runtime. */
+:root {
+  --brand-burgundy: #6F1947;
+  --brand-magenta: #B61B54;
+  --brand-pink: #F5989D;
+  --plum-900: #2A0719;
+  --plum-800: #420C29;
+  --plum-700: #5B1239;
+  --plum-200: #E7B7CE;
+  --plum-100: #F4DDE8;
+  --plum-50: #FBF3F7;
+
+  --bg-canvas: #FAF7F8;
+  --bg-surface: #FFFFFF;
+  --ink-50: #F4F2F3;
+  --ink-100: #E9E5E7;
+  --ink-200: #D7D0D3;
+  --ink-300: #B9AEB3;
+
+  --fg-1: #231F20;
+  --fg-2: #4A4145;
+  --fg-3: #807379;
+  --fg-4: #A89DA3;
+
+  --border-subtle: #E9E5E7;
+  --border-strong: #D7D0D3;
+
+  --success-50: #ECFDF5; --success-500: #1FA855; --success-700: #136138;
+  --warning-50: #FEF8EC; --warning-500: #D78A14; --warning-700: #9A6A11;
+  --danger-50: #FEF2F2;  --danger-400: #E26B7A;  --danger-500: #C0263A; --danger-700: #991B1B;
+  --info-50: #EFF6FF;    --info-700: #2563B0;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, Menlo, Monaco, "Cascadia Code", monospace;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--fg-1);
+  background: var(--bg-canvas);
+  -webkit-font-smoothing: antialiased;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

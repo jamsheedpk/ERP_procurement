@@ -1,0 +1,14 @@
+{
+  "name": "meridian-mfe",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Meridian ERP — micro-frontend monorepo (Vite + Module Federation)",
+  "scripts": {
+    "build": "pnpm -r --filter \"./apps/*\" build",
+    "dev": "concurrently -n shell,procurement,hr,finance,projects -c magenta,cyan,green,yellow,blue \"pnpm --filter shell dev\" \"pnpm --filter procurement serve\" \"pnpm --filter hr serve\" \"pnpm --filter finance serve\" \"pnpm --filter projects serve\"",
+    "preview": "concurrently -n shell,procurement,hr,finance,projects \"pnpm --filter shell preview\" \"pnpm --filter procurement preview\" \"pnpm --filter hr preview\" \"pnpm --filter finance preview\" \"pnpm --filter projects preview\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
