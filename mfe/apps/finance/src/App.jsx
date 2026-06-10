@@ -1,27 +1,38 @@
-import React, { useEffect, useState } from "react";
-import { api } from "@meridian/api";
-import { KPI, Spinner, Icon } from "@meridian/ui";
+import React, { useState } from "react";
+import "./legacy/hrm.css";
+import "./fin.css";
+import { Icon } from "./legacy.jsx";
+import ExpensePage from "./pages/ExpensePage.jsx";
+import CashBookPage from "./pages/CashBookPage.jsx";
+import DayBookPage from "./pages/DayBookPage.jsx";
+import PartyPage from "./pages/PartyPage.jsx";
 
-// Stub remote. Migrate Cash Book, Day Book, Expenses & Parties here.
+const PAGES = [
+  { id: "expense",  label: "Expenses",  icon: "receipt" },
+  { id: "cashbook", label: "Cash Book", icon: "book-open" },
+  { id: "daybook",  label: "Day Book",  icon: "notebook" },
+  { id: "parties",  label: "Parties",   icon: "building-2" },
+];
+
 export default function App() {
-  const [count, setCount] = useState(null);
-  const [err, setErr] = useState(false);
-  useEffect(() => {
-    api.get("/parties").then((d) => setCount(Array.isArray(d) ? d.length : 0)).catch(() => setErr(true));
-  }, []);
+  const [route, setRoute] = useState("expense");
+  let page;
+  switch (route) {
+    case "cashbook": page = <CashBookPage />; break;
+    case "daybook":  page = <DayBookPage />; break;
+    case "parties":  page = <PartyPage />; break;
+    default:         page = <ExpensePage />;
+  }
   return (
-    <div style={{ padding: 28 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <Icon name="wallet" size={20} color="var(--brand-burgundy)" />
-        <h1 style={{ margin: 0, fontSize: 22 }}>Finance</h1>
+    <div className="fin-shell">
+      <div className="fin-subnav">
+        {PAGES.map((p) => (
+          <button key={p.id} className={"fin-subnav-item" + (route === p.id ? " fin-subnav-item--active" : "")} onClick={() => setRoute(p.id)}>
+            <Icon name={p.icon} size={15} /><span>{p.label}</span>
+          </button>
+        ))}
       </div>
-      <p style={{ color: "var(--fg-3)", fontSize: 13, marginTop: 0 }}>
-        Finance micro-frontend (stub). Cash book, day book, expenses &amp; parties migrate here.
-      </p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, maxWidth: 720 }}>
-        <KPI label="Parties" value={err ? "—" : count == null ? "…" : count} sub="from shared API" icon="building-2" />
-      </div>
-      {count == null && !err && <Spinner label="Querying shared API…" />}
+      <div className="fin-content">{page}</div>
     </div>
   );
 }

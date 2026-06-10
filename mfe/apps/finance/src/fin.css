@@ -1,0 +1,6 @@
+.fin-shell { display: flex; min-height: 100vh; }
+.fin-subnav { width: 168px; flex-shrink: 0; border-right: 1px solid var(--border-subtle); background: var(--bg-surface); padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; align-self: flex-start; max-height: 100vh; overflow: auto; }
+.fin-subnav-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; border: none; background: transparent; color: var(--fg-2); font-size: 12.5px; font-weight: 500; cursor: pointer; text-align: left; font-family: var(--font-sans); }
+.fin-subnav-item:hover { background: var(--ink-50); }
+.fin-subnav-item--active { background: var(--brand-burgundy); color: #fff; }
+.fin-content { flex: 1; min-width: 0; overflow: auto; }

@@ -1,27 +1,40 @@
-import React, { useEffect, useState } from "react";
-import { api } from "@meridian/api";
-import { KPI, Spinner, Icon } from "@meridian/ui";
+import React, { useState } from "react";
+import "./legacy/hrm.css";
+import "./proj.css";
+import { Icon } from "./legacy.jsx";
+import ProjectPage from "./pages/ProjectPage.jsx";
+import QuotationPage from "./pages/QuotationPage.jsx";
+import InvoicePage from "./pages/InvoicePage.jsx";
+import ProjectReportPage from "./pages/ProjectReportPage.jsx";
 
-// Stub remote. Migrate the project pipeline, quotations, invoices & P&L here.
+const PAGES = [
+  { id: "pipeline",   label: "Pipeline",   icon: "folder-kanban" },
+  { id: "quotations", label: "Quotations", icon: "file-text" },
+  { id: "invoices",   label: "Invoices",   icon: "file-check-2" },
+  { id: "projreport", label: "P&L Report", icon: "bar-chart-3" },
+];
+
 export default function App() {
-  const [count, setCount] = useState(null);
-  const [err, setErr] = useState(false);
-  useEffect(() => {
-    api.get("/projects").then((d) => setCount(Array.isArray(d) ? d.length : 0)).catch(() => setErr(true));
-  }, []);
+  const [route, setRoute] = useState("pipeline");
+  // onNav lets Quotation→Invoice cross-navigation work (monolith passes route ids).
+  const onNav = (id) => setRoute(id === "invoices" ? "invoices" : id);
+  let page;
+  switch (route) {
+    case "quotations": page = <QuotationPage onNav={onNav} />; break;
+    case "invoices":   page = <InvoicePage onNav={onNav} />; break;
+    case "projreport": page = <ProjectReportPage />; break;
+    default:           page = <ProjectPage />;
+  }
   return (
-    <div style={{ padding: 28 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <Icon name="folder-kanban" size={20} color="var(--brand-burgundy)" />
-        <h1 style={{ margin: 0, fontSize: 22 }}>Projects</h1>
+    <div className="proj-shell">
+      <div className="proj-subnav">
+        {PAGES.map((p) => (
+          <button key={p.id} className={"proj-subnav-item" + (route === p.id ? " proj-subnav-item--active" : "")} onClick={() => setRoute(p.id)}>
+            <Icon name={p.icon} size={15} /><span>{p.label}</span>
+          </button>
+        ))}
       </div>
-      <p style={{ color: "var(--fg-3)", fontSize: 13, marginTop: 0 }}>
-        Projects micro-frontend (stub). Pipeline, quotations, invoices &amp; P&amp;L migrate here.
-      </p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, maxWidth: 720 }}>
-        <KPI label="Projects" value={err ? "—" : count == null ? "…" : count} sub="from shared API" icon="folder-kanban" />
-      </div>
-      {count == null && !err && <Spinner label="Querying shared API…" />}
+      <div className="proj-content">{page}</div>
     </div>
   );
 }
