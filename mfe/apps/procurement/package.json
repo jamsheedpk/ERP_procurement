@@ -13,6 +13,9 @@
     "@meridian/api": "workspace:*",
     "@meridian/theme": "workspace:*",
     "@meridian/ui": "workspace:*",
+    "jspdf": "^2.5.2",
+    "jspdf-autotable": "^3.8.4",
+    "lucide-react": "^0.456.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
