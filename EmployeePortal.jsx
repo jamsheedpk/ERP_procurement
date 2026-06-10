@@ -6,6 +6,9 @@ const EP_NAV = [
   { sec: "Overview", items: [
     { id: "home",     label: "Home",        icon: "layout-dashboard" },
   ]},
+  { sec: "Work", items: [
+    { id: "projects", label: "My Projects", icon: "folder-kanban" },
+  ]},
   { sec: "My Time", items: [
     { id: "leave",    label: "Leave",       icon: "calendar-off" },
     { id: "attend",   label: "Attendance",  icon: "clock" },
@@ -17,6 +20,30 @@ const EP_NAV = [
     { id: "profile",  label: "My Profile",  icon: "user" },
   ]},
 ];
+
+/* Project stage / priority styling — mirrors ProjectPage conventions */
+const EP_STAGE_META = {
+  quotation:         { label: "Quotation",         icon: "file-text",      color: "#2563B0" },
+  discussion:        { label: "Discussion",        icon: "message-circle", color: "#D78A14" },
+  approved:          { label: "Approved",          icon: "check-circle-2", color: "#1F8A52" },
+  advance_collected: { label: "Advance Collected", icon: "banknote",       color: "#534AB7" },
+  work_started:      { label: "Work Started",      icon: "hard-hat",       color: "#6F1947" },
+  completed:         { label: "Completed",         icon: "flag",           color: "#0F6E56" },
+  on_hold:           { label: "On Hold",           icon: "pause-circle",   color: "#807379" },
+  cancelled:         { label: "Cancelled",         icon: "x-circle",       color: "#C0263A" },
+};
+const EP_PRI_META = {
+  low:    { label: "Low",    color: "#A89DA3" },
+  medium: { label: "Medium", color: "#D78A14" },
+  high:   { label: "High",   color: "#C0263A" },
+  urgent: { label: "Urgent", color: "#B61B54" },
+};
+function epStageMeta(s) { return EP_STAGE_META[s] || EP_STAGE_META.quotation; }
+function epProjAmount(p) {
+  if (p.stage === "completed" && p.finalAmount > 0) return { amount: p.finalAmount, label: "Final" };
+  if (p.approvedAmount > 0) return { amount: p.approvedAmount, label: "Approved" };
+  return { amount: p.quotationAmount || 0, label: "Quotation" };
+}
 
 const LEAVE_TYPE_COLORS = {
   annual:       "#1F8A52",
@@ -54,6 +81,7 @@ function EmployeePortal({ authUser, token, onLogout }) {
   const [leaves,     setLeaves]     = useStateEP([]);
   const [leaveTypes, setLeaveTypes] = useStateEP([]);
   const [payslip,    setPayslip]    = useStateEP(null);
+  const [projects,   setProjects]   = useStateEP([]);
   const [loading,    setLoading]    = useStateEP(true);
   const [error,      setError]      = useStateEP(null);
   const [route,      setRoute]      = useStateEP("home");
@@ -61,21 +89,29 @@ function EmployeePortal({ authUser, token, onLogout }) {
 
   useEffectEP(() => {
     const headers = { Authorization: `Bearer ${token}` };
+    let myName = authUser.name;
     Promise.all([
       fetch(`${API}/auth/my-profile`, { headers }).then(r => r.json()),
       fetch(`${API}/leave-types`).then(r => r.json()),
     ]).then(([profileData, types]) => {
       if (profileData.message) throw new Error(profileData.message);
       setProfile(profileData.employee);
+      myName = profileData.employee.name;
       setLeaveTypes(types);
       return Promise.all([
         fetch(`${API}/leave-requests?empId=${profileData.employee.empId}`).then(r => r.json()),
         fetch(`${API}/payroll/latest`).then(r => r.json()),
+        fetch(`${API}/projects`).then(r => r.json()),
       ]);
-    }).then(([lvs, payrollRun]) => {
+    }).then(([lvs, payrollRun, allProjects]) => {
       setLeaves(lvs);
       const line = (payrollRun.lines || []).find(l => l.empId === authUser.empId);
       setPayslip(line || null);
+      // Projects this employee is assigned to (as lead or site engineer), matched by name
+      const mine = (Array.isArray(allProjects) ? allProjects : []).filter(p =>
+        (p.assignedTo && p.assignedTo === myName) || (p.siteEngineer && p.siteEngineer === myName)
+      );
+      setProjects(mine);
       setLoading(false);
     }).catch(err => { setError(err.message || "Could not load your profile."); setLoading(false); });
   }, []);
@@ -103,15 +139,17 @@ function EmployeePortal({ authUser, token, onLogout }) {
 
   const emp = profile;
   const addLeave = (lv) => setLeaves(prev => [{ ...lv, id: lv.leaveId }, ...prev]);
+  const updateProject = (doc) => setProjects(prev => prev.map(p => p.projectId === doc.projectId ? doc : p));
 
-  const pageProps = { emp, leaves, leaveTypes, payslip, token, onNav: setRoute, onRequestLeave: () => setShowReq(true), addLeave };
+  const pageProps = { emp, leaves, leaveTypes, payslip, projects, token, onNav: setRoute, onRequestLeave: () => setShowReq(true), addLeave, onProjectUpdate: updateProject };
 
   let page;
-  if      (route === "home")    page = <EmpHome    {...pageProps} />;
-  else if (route === "leave")   page = <EmpLeave   {...pageProps} showReq={showReq} setShowReq={setShowReq} />;
-  else if (route === "attend")  page = <EmpAttend  {...pageProps} />;
-  else if (route === "payslip") page = <EmpPayslip {...pageProps} />;
-  else if (route === "profile") page = <EmpProfile {...pageProps} />;
+  if      (route === "home")     page = <EmpHome     {...pageProps} />;
+  else if (route === "projects") page = <EmpProjects {...pageProps} />;
+  else if (route === "leave")    page = <EmpLeave    {...pageProps} showReq={showReq} setShowReq={setShowReq} />;
+  else if (route === "attend")   page = <EmpAttend   {...pageProps} />;
+  else if (route === "payslip")  page = <EmpPayslip  {...pageProps} />;
+  else if (route === "profile")  page = <EmpProfile  {...pageProps} />;
   else page = <EmpHome {...pageProps} />;
 
   return (
@@ -274,6 +312,7 @@ function EmpHome({ emp, leaves, leaveTypes, payslip, onNav, onRequestLeave }) {
             <div className="card-pad" style={{ paddingTop: 0, display: "flex", flexDirection: "column", gap: 8 }}>
               {[
                 { label: "Request leave",     icon: "calendar-plus", action: onRequestLeave, primary: true },
+                { label: "My projects",       icon: "folder-kanban", action: () => onNav("projects") },
                 { label: "View payslip",      icon: "wallet",        action: () => onNav("payslip") },
                 { label: "My attendance",     icon: "clock",         action: () => onNav("attend") },
                 { label: "Profile & docs",    icon: "user",          action: () => onNav("profile") },
@@ -344,6 +383,342 @@ function EmpHome({ emp, leaves, leaveTypes, payslip, onNav, onRequestLeave }) {
               );
             })}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── My Projects page ─────────────────────────────────────────────────── */
+function EmpProjects({ emp, projects, onNav, onProjectUpdate }) {
+  const [stageFilter, setStageFilter] = useStateEP("all");
+  const [openProj,    setOpenProj]    = useStateEP(null);
+
+  // Keep both the list and the open modal in sync after a discussion is added.
+  const handleProjUpdate = (doc) => { if (onProjectUpdate) onProjectUpdate(doc); setOpenProj(doc); };
+
+  const active = projects.filter(p => ["completed", "cancelled", "on_hold"].indexOf(p.stage) < 0);
+  const stats = {
+    total:     projects.length,
+    active:    active.length,
+    completed: projects.filter(p => p.stage === "completed").length,
+    leading:   projects.filter(p => p.assignedTo === emp.name).length,
+  };
+
+  const filtered = stageFilter === "all" ? projects : projects.filter(p => p.stage === stageFilter);
+
+  // Stage filter pills, only for stages that actually appear
+  const presentStages = [];
+  projects.forEach(p => { if (presentStages.indexOf(p.stage) < 0) presentStages.push(p.stage); });
+
+  return (
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Work · Projects</div>
+          <h1 className="page-title">My Projects</h1>
+          <div className="page-sub">{stats.total} assigned · {stats.active} active · {stats.completed} completed</div>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid-4" style={{ marginBottom: 20 }}>
+        <div className="kpi">
+          <div className="lbl">Assigned to me</div>
+          <div className="val">{stats.total}</div>
+          <div className="muted" style={{ fontSize: 11.5 }}>across all stages</div>
+          <div className="ico" style={{ background: "var(--plum-50)", color: "var(--brand-burgundy)" }}><Icon name="folder-kanban" size={16} /></div>
+        </div>
+        <div className="kpi">
+          <div className="lbl">Active</div>
+          <div className="val" style={{ color: "var(--success-700)" }}>{stats.active}</div>
+          <div className="muted" style={{ fontSize: 11.5 }}>in progress</div>
+          <div className="ico" style={{ background: "var(--success-50)", color: "var(--success-700)" }}><Icon name="activity" size={16} /></div>
+        </div>
+        <div className="kpi">
+          <div className="lbl">Completed</div>
+          <div className="val" style={{ color: "var(--info-700)" }}>{stats.completed}</div>
+          <div className="muted" style={{ fontSize: 11.5 }}>delivered</div>
+          <div className="ico" style={{ background: "var(--info-50)", color: "var(--info-700)" }}><Icon name="flag" size={16} /></div>
+        </div>
+        <div className="kpi">
+          <div className="lbl">Leading</div>
+          <div className="val">{stats.leading}</div>
+          <div className="muted" style={{ fontSize: 11.5 }}>as project lead</div>
+          <div className="ico" style={{ background: "var(--warning-50)", color: "var(--warning-700)" }}><Icon name="user-check" size={16} /></div>
+        </div>
+      </div>
+
+      {/* Project list */}
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title-lg">Assigned projects</div>
+            <div className="card-sub">Projects where you are the lead or site engineer</div>
+          </div>
+        </div>
+
+        {projects.length === 0 ? (
+          <div style={{ padding: "56px 20px", textAlign: "center", color: "var(--fg-3)", fontSize: 13 }}>
+            <Icon name="folder-open" size={28} color="var(--ink-300)" />
+            <div style={{ marginTop: 10, fontWeight: 600, fontSize: 14, color: "var(--fg-2)" }}>No projects assigned to you yet</div>
+            <div style={{ marginTop: 4 }}>Projects you lead or supervise will appear here.</div>
+          </div>
+        ) : (
+          <React.Fragment>
+            {/* Stage filter pills */}
+            <div className="att-status-filter">
+              <button className={"att-filter-btn" + (stageFilter === "all" ? " att-filter-btn--active" : "")} onClick={() => setStageFilter("all")}>
+                All <span className="att-filter-ct">{projects.length}</span>
+              </button>
+              {presentStages.map(s => {
+                const m = epStageMeta(s);
+                return (
+                  <button key={s} className={"att-filter-btn" + (stageFilter === s ? " att-filter-btn--active" : "")} onClick={() => setStageFilter(s)}>
+                    {m.label} <span className="att-filter-ct">{projects.filter(p => p.stage === s).length}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "4px 16px 16px" }}>
+              {filtered.map(p => {
+                const sm = epStageMeta(p.stage);
+                const pri = EP_PRI_META[p.priority] || EP_PRI_META.medium;
+                const role = p.assignedTo === emp.name ? "Project Lead" : "Site Engineer";
+                return (
+                  <div key={p.projectId} className="card ep-proj-card" style={{ padding: 14, borderLeft: `3px solid ${sm.color}`, cursor: "pointer" }}
+                    onClick={() => setOpenProj(p)} role="button" title="View project details">
+                    <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="row-tight" style={{ gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                          <span style={{ fontWeight: 700, fontSize: 14, color: "var(--fg-1)" }}>{p.title}</span>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 5, background: sm.color + "18", color: sm.color }}>
+                            <Icon name={sm.icon} size={10} />{sm.label}
+                          </span>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 5, background: pri.color + "18", color: pri.color }}>{pri.label}</span>
+                        </div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          {p.projectId}{p.partyName ? ` · ${p.partyName}` : ""}{p.location ? ` · ${p.location}` : ""}
+                        </div>
+                        <div className="row-tight" style={{ gap: 6, marginTop: 8 }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: "var(--fg-3)", background: "var(--ink-50)", padding: "2px 8px", borderRadius: 999 }}>
+                            <Icon name="user-check" size={11} />{role}
+                          </span>
+                          {p.expectedCompletion && p.stage !== "completed" && (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: "var(--fg-3)", background: "var(--ink-50)", padding: "2px 8px", borderRadius: 999 }}>
+                              <Icon name="calendar" size={11} />Due {p.expectedCompletion}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Icon name="chevron-right" size={16} color="var(--fg-4)" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </React.Fragment>
+        )}
+      </div>
+
+      {openProj && <EmpProjectDetail project={openProj} emp={emp} onClose={() => setOpenProj(null)} onProjectUpdate={handleProjUpdate} />}
+    </div>
+  );
+}
+
+/* ── Project detail (read-only, no financials) ────────────────────────────── */
+const EP_PROJ_STAGE_FLOW = ["quotation", "discussion", "approved", "advance_collected", "work_started", "completed"];
+
+function EmpProjectDetail({ project: p, emp, onClose, onProjectUpdate }) {
+  const sm = epStageMeta(p.stage);
+  const pri = EP_PRI_META[p.priority] || EP_PRI_META.medium;
+  const role = p.assignedTo === emp.name ? "Project Lead" : "Site Engineer";
+  const isClosed = p.stage === "cancelled" || p.stage === "on_hold";
+  const curIdx = EP_PROJ_STAGE_FLOW.indexOf(p.stage);
+
+  // Add-discussion form
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const [showForm, setShowForm] = useStateEP(false);
+  const [form, setForm]   = useStateEP({ date: todayISO, notes: "", outcome: "" });
+  const [saving, setSaving] = useStateEP(false);
+  const [err, setErr]     = useStateEP("");
+  const setF = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErr(""); };
+
+  const submitDiscussion = async () => {
+    if (!form.notes.trim()) { setErr("Please enter a note."); return; }
+    setSaving(true);
+    try {
+      const res = await fetch(`${API}/projects/${p.projectId}/discussions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: form.date || todayISO, notes: form.notes.trim(), outcome: form.outcome.trim(), by: emp.name }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      const doc = await res.json();
+      if (onProjectUpdate) onProjectUpdate(doc);
+      setForm({ date: todayISO, notes: "", outcome: "" });
+      setShowForm(false);
+    } catch (e) { setErr("Could not save the discussion. Please try again."); }
+    setSaving(false);
+  };
+
+  const info = [
+    { icon: "building-2", label: "Client", value: p.partyName },
+    { icon: "map-pin",    label: "Location", value: p.location },
+    { icon: "home",       label: "Type", value: p.type },
+    { icon: "flag",       label: "Priority", value: pri.label },
+    { icon: "user",       label: "Assigned to", value: p.assignedTo },
+    { icon: "hard-hat",   label: "Site engineer", value: p.siteEngineer },
+  ].filter(f => f.value);
+
+  const dates = [
+    { label: "Quotation",           value: p.quotationDate },
+    { label: "Approved",            value: p.approvedDate },
+    { label: "Advance collected",   value: p.advanceDate },
+    { label: "Work started",        value: p.workStartDate },
+    { label: "Expected completion", value: p.expectedCompletion },
+    { label: "Completed",           value: p.completionDate },
+  ].filter(d => d.value);
+
+  const discussions = Array.isArray(p.discussions) ? p.discussions : [];
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 620, width: "100%" }} onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <div className="modal-head-icon" style={{ background: sm.color + "18", color: sm.color }}>
+            <Icon name={sm.icon} size={18} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="modal-title">{p.title}</div>
+            <div className="modal-subtitle">{p.projectId} · {role}</div>
+          </div>
+          <button className="icon-btn modal-close" onClick={onClose}><Icon name="x" size={18} /></button>
+        </div>
+
+        <div className="modal-body stack" style={{ gap: 18 }}>
+          {/* Current stage banner */}
+          <div className="row" style={{ gap: 8, padding: "9px 12px", borderRadius: 9, background: sm.color + "14", alignItems: "center" }}>
+            <Icon name={sm.icon} size={15} color={sm.color} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: sm.color }}>{sm.label}</span>
+            {isClosed && <span style={{ fontSize: 11, color: "var(--fg-3)" }}>· this project is {sm.label.toLowerCase()}</span>}
+          </div>
+
+          {/* Stage timeline */}
+          {!isClosed && (
+            <div>
+              <div className="ep-detail-heading">Stage progress</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {EP_PROJ_STAGE_FLOW.map((s, i) => {
+                  const m = epStageMeta(s);
+                  const done = i < curIdx, cur = i === curIdx;
+                  return (
+                    <div key={s} className="row-tight" style={{ gap: 5, alignItems: "center" }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600,
+                        padding: "3px 9px", borderRadius: 999,
+                        background: cur ? m.color : done ? m.color + "22" : "var(--ink-50)",
+                        color: cur ? "#fff" : done ? m.color : "var(--fg-4)" }}>
+                        {done && <Icon name="check" size={10} />}{m.label}
+                      </span>
+                      {i < EP_PROJ_STAGE_FLOW.length - 1 && <Icon name="chevron-right" size={12} color="var(--fg-4)" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Info grid */}
+          <div>
+            <div className="ep-detail-heading">Details</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {info.map(f => (
+                <div key={f.label} className="row" style={{ gap: 10, alignItems: "center" }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 8, background: "var(--ink-100)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Icon name={f.icon} size={13} color="var(--fg-3)" />
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700, color: "var(--fg-4)" }}>{f.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--fg-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textTransform: f.label === "Type" ? "capitalize" : "none" }}>{f.value}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {p.description && <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--fg-2)", lineHeight: 1.5 }}>{p.description}</div>}
+          </div>
+
+          {/* Key dates */}
+          {dates.length > 0 && (
+            <div>
+              <div className="ep-detail-heading">Key dates</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {dates.map(d => (
+                  <div key={d.label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--ink-100)", fontSize: 12.5 }}>
+                    <span style={{ color: "var(--fg-3)" }}>{d.label}</span>
+                    <span style={{ fontWeight: 600, color: "var(--fg-1)" }}>{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Discussion log */}
+          <div>
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+              <div className="ep-detail-heading" style={{ marginBottom: 0 }}>Discussion log {discussions.length > 0 && <span style={{ color: "var(--fg-4)", fontWeight: 400 }}>· {discussions.length}</span>}</div>
+              {!showForm && !isClosed && (
+                <Button variant="ghost" size="sm" icon="message-square-plus" onClick={() => { setShowForm(true); setErr(""); }}>Add discussion</Button>
+              )}
+            </div>
+
+            {showForm && (
+              <div style={{ margin: "10px 0 14px", padding: 12, borderRadius: 10, border: "1px solid var(--border-subtle)", background: "var(--ink-50)" }}>
+                <div className="form-grid" style={{ marginBottom: 10 }}>
+                  <div className="form-group">
+                    <label className="label">Date</label>
+                    <input className="fi" type="date" value={form.date} onChange={e => setF("date", e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="label">Outcome <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--fg-3)" }}>(optional)</span></label>
+                    <input className="fi" value={form.outcome} onChange={e => setF("outcome", e.target.value)} placeholder="e.g. Proceed to next stage" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="label">Note <span className="req">*</span></label>
+                  <textarea className="fi" rows={3} value={form.notes} onChange={e => setF("notes", e.target.value)} placeholder="What was discussed or done on site…" />
+                </div>
+                {err && <div className="form-err" style={{ marginTop: 8 }}><Icon name="alert-circle" size={14} color="var(--danger-700)" />{err}</div>}
+                <div className="row" style={{ justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
+                  <Button variant="secondary" size="sm" onClick={() => { setShowForm(false); setErr(""); }}>Cancel</Button>
+                  <Button variant="primary" size="sm" icon="check" onClick={submitDiscussion} disabled={saving || !form.notes.trim()}>
+                    {saving ? "Saving…" : "Post discussion"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {discussions.length === 0 ? (
+              <div style={{ fontSize: 12.5, color: "var(--fg-4)", padding: "6px 0" }}>No discussions recorded yet.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {discussions.map((d, i) => (
+                  <div key={i} style={{ padding: "10px 12px", borderRadius: 9, background: "var(--ink-50)", borderLeft: "3px solid var(--brand-burgundy)" }}>
+                    <div className="row" style={{ justifyContent: "space-between", marginBottom: 3 }}>
+                      <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fg-2)" }}>{d.by || "—"}</span>
+                      <span style={{ fontSize: 11, color: "var(--fg-4)" }}>{d.date || ""}</span>
+                    </div>
+                    {d.notes && <div style={{ fontSize: 12.5, color: "var(--fg-1)", lineHeight: 1.5 }}>{d.notes}</div>}
+                    {d.outcome && <div style={{ fontSize: 11.5, color: "var(--success-700)", marginTop: 3 }}>→ {d.outcome}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="modal-foot">
+          <Button variant="secondary" onClick={onClose}>Close</Button>
         </div>
       </div>
     </div>

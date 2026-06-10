@@ -1,9 +1,33 @@
 const express     = require("express");
 const router      = express.Router();
+const fs          = require("fs");
+const path        = require("path");
+const multer      = require("multer");
 const Procurement = require("../models/Procurement");
+
+const QUOTE_DIR = path.join(__dirname, "../../uploads/procurement");
+fs.mkdirSync(QUOTE_DIR, { recursive: true });
 const { PROC_STAGES, STAGE_KEYS } = Procurement;
 
 const stageMeta = key => PROC_STAGES.find(s => s.key === key) || null;
+
+// Vendor quote document uploads (step 4 — Comparison).
+const quoteStorage = multer.diskStorage({
+  destination: QUOTE_DIR,
+  filename: (req, file, cb) => {
+    const ext  = path.extname(file.originalname);
+    const base = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, "_");
+    cb(null, `${Date.now()}_${base}${ext}`);
+  },
+});
+const quoteUpload = multer({
+  storage: quoteStorage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".heic", ".webp"];
+    cb(null, allowed.includes(path.extname(file.originalname).toLowerCase()));
+  },
+});
 
 // GET /api/procurement/stages — expose the canonical 12-stage definition
 router.get("/stages", (req, res) => res.json(PROC_STAGES));
@@ -108,6 +132,97 @@ router.post("/:id/stage", async (req, res) => {
     if (!doc) return res.status(404).json({ error: "Not found" });
     res.json(doc);
   } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+/*
+ * POST /api/procurement/:id/quote-file  (multipart)
+ * Attach a vendor's quotation document for a category. Field `file`, plus body
+ * { category, vendor }. One file per (category, vendor) — re-uploading replaces
+ * the previous attachment (and deletes the old file from disk).
+ */
+router.post("/:id/quote-file", quoteUpload.single("file"), async (req, res) => {
+  try {
+    const { category = "", vendor = "" } = req.body || {};
+    if (!req.file)        return res.status(400).json({ error: "No file uploaded" });
+    if (!vendor.trim())   return res.status(400).json({ error: "Vendor is required" });
+    if (!category.trim()) return res.status(400).json({ error: "Category is required" });
+
+    const doc = await Procurement.findOne({ procId: req.params.id });
+    if (!doc) return res.status(404).json({ error: "Not found" });
+
+    // Replace any existing attachment for this (category, vendor) pair.
+    const existing = (doc.quoteFiles || []).find(q => q.category === category && q.vendor === vendor);
+    if (existing && existing.filePath) {
+      const old = path.join(__dirname, "../../", existing.filePath);
+      fs.unlink(old, () => {});   // best-effort; ignore if already gone
+    }
+    doc.quoteFiles = (doc.quoteFiles || []).filter(q => !(q.category === category && q.vendor === vendor));
+    doc.quoteFiles.push({
+      category, vendor,
+      fileName:   req.file.originalname,
+      filePath:   `/uploads/procurement/${req.file.filename}`,
+      fileSizeMB: +(req.file.size / (1024 * 1024)).toFixed(2),
+      uploadedAt: new Date(),
+    });
+    await doc.save();
+    res.json(doc);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// DELETE /api/procurement/:id/quote-file?category=&vendor=  — remove one attachment
+router.delete("/:id/quote-file", async (req, res) => {
+  try {
+    const { category = "", vendor = "" } = req.query || {};
+    const doc = await Procurement.findOne({ procId: req.params.id });
+    if (!doc) return res.status(404).json({ error: "Not found" });
+
+    const existing = (doc.quoteFiles || []).find(q => q.category === category && q.vendor === vendor);
+    if (existing && existing.filePath) {
+      fs.unlink(path.join(__dirname, "../../", existing.filePath), () => {});
+    }
+    doc.quoteFiles = (doc.quoteFiles || []).filter(q => !(q.category === category && q.vendor === vendor));
+    await doc.save();
+    res.json(doc);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/*
+ * POST /api/procurement/:id/proforma-file  (multipart, field `file`)
+ * Attach the Proforma Invoice document (step 7). One file — re-uploading
+ * replaces the previous one and deletes the old file from disk.
+ */
+router.post("/:id/proforma-file", quoteUpload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const doc = await Procurement.findOne({ procId: req.params.id });
+    if (!doc) return res.status(404).json({ error: "Not found" });
+
+    if (doc.proformaFile && doc.proformaFile.filePath) {
+      fs.unlink(path.join(__dirname, "../../", doc.proformaFile.filePath), () => {});
+    }
+    doc.proformaFile = {
+      fileName:   req.file.originalname,
+      filePath:   `/uploads/procurement/${req.file.filename}`,
+      fileSizeMB: +(req.file.size / (1024 * 1024)).toFixed(2),
+      uploadedAt: new Date(),
+    };
+    await doc.save();
+    res.json(doc);
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// DELETE /api/procurement/:id/proforma-file — remove the proforma invoice doc
+router.delete("/:id/proforma-file", async (req, res) => {
+  try {
+    const doc = await Procurement.findOne({ procId: req.params.id });
+    if (!doc) return res.status(404).json({ error: "Not found" });
+    if (doc.proformaFile && doc.proformaFile.filePath) {
+      fs.unlink(path.join(__dirname, "../../", doc.proformaFile.filePath), () => {});
+    }
+    doc.proformaFile = null;
+    await doc.save();
+    res.json(doc);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.delete("/:id", async (req, res) => {

@@ -6,7 +6,7 @@ const {
   useCallback: useCallbackPR,
 } = React;
 
-// ── Canonical 12-stage lifecycle (mirrors backend/models/Procurement.js) ────────
+// ── Canonical 11-stage lifecycle (mirrors backend/models/Procurement.js) ────────
 const PROC_STAGES = [
   { key: "enquiry",             label: "Enquiry",             icon: "search",        department: "Project Manager",  action: "Study project scope & requirements",   responsible: "Project Manager", phase: "Initiation" },
   { key: "prepare_list",        label: "Prepare List",        icon: "list-checks",   department: "Project Engineer", action: "Material & Labour List Preparation",   responsible: "Procurement",     phase: "Initiation" },
@@ -14,9 +14,8 @@ const PROC_STAGES = [
   { key: "comparison",          label: "Comparison",          icon: "scale",         department: "Procurement",      action: "Technical & Price Comparison (Min 3)", responsible: "Project Manager", phase: "Sourcing" },
   { key: "approval",            label: "Approval",            icon: "check-circle",  department: "Project Manager",  action: "Quote Review & Final Approval",        responsible: "Procurement",     phase: "Sourcing" },
   { key: "lpo",                 label: "LPO Issue",           icon: "file-output",   department: "Procurement",      action: "Create & Send Local Purchase Order",   responsible: "Vendor",          phase: "Ordering" },
-  { key: "payment_application", label: "Payment Application", icon: "file-plus",     department: "Procurement",      action: "Generate Payment Application",         responsible: "Project Manager", phase: "Ordering" },
-  { key: "proforma",            label: "Proforma Recv",       icon: "receipt",       department: "Procurement",      action: "Collect Invoice for Payment",          responsible: "Accounts",        phase: "Payment" },
-  { key: "payment_req",         label: "Payment Req",         icon: "file-clock",    department: "Accountant",       action: "Generate Payment Application",         responsible: "Project Manager", phase: "Payment" },
+  { key: "proforma",            label: "Proforma Invoice",    icon: "receipt",       department: "Procurement",      action: "Collect Invoice for Payment",          responsible: "Accounts",        phase: "Payment" },
+  { key: "payment_application", label: "Payment Application", icon: "file-plus",     department: "Procurement",      action: "Generate Payment Application",         responsible: "Project Manager", phase: "Payment" },
   { key: "payment_appr",        label: "Payment Approval",    icon: "badge-check",   department: "Project Manager",  action: "Review & Approve Payment",             responsible: "Accountant",      phase: "Payment" },
   { key: "payment_release",     label: "Payment Release",     icon: "banknote",      department: "Accountant",       action: "Issue Cheque / Bank Transfer",         responsible: "Procurement",     phase: "Payment" },
   { key: "logistics",           label: "Logistics",           icon: "truck",         department: "Procurement",      action: "Arrange Loading & Site Delivery",      responsible: "Store / Site",    phase: "Delivery" },
@@ -41,7 +40,7 @@ const PRIORITY_META = {
 };
 const REQ_DEPARTMENTS = ["Operations", "Warehouse", "Fleet", "Finance", "Sales", "Technology", "Legal & PRO", "People & Culture"];
 
-const stageIndex = k => STAGE_KEYS.indexOf(k);
+const procStageIndex = k => STAGE_KEYS.indexOf(k);
 const AED = n => "AED " + (Number(n) || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 const fmtDatePR = d => {
   if (!d) return "";
@@ -329,14 +328,43 @@ function ProcurementFormModal({ initial, onClose, onSave }) {
 }
 
 // ── Advance / sign-off modal ────────────────────────────────────────────────────
-function AdvanceModal({ proc, onClose, onConfirm }) {
+function AdvanceModal({ proc, onClose, onConfirm, onUploaded }) {
   const stage = STAGE_BY_KEY[proc.currentStage];
-  const isFinal = stageIndex(proc.currentStage) === STAGE_KEYS.length - 1;
+  const isFinal = procStageIndex(proc.currentStage) === STAGE_KEYS.length - 1;
   const [by, setBy]     = useStatePR("");
   const [note, setNote] = useStatePR("");
   const [patch, setPatch] = useStatePR({});
   const [saving, setSaving] = useStatePR(false);
   const setP = k => e => setPatch(p => ({ ...p, [k]: e.target.value }));
+
+  // Proforma invoice attachment (step 7) — uploaded immediately, kept in local state.
+  const FILE_BASE = (window.API || "").replace(/\/api$/, "");
+  const [proformaFile, setProformaFile] = useStatePR(proc.proformaFile || null);
+  const [uploadingPF, setUploadingPF]   = useStatePR(false);
+
+  const uploadProforma = async (file) => {
+    if (!file) return;
+    setUploadingPF(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${window.API}/procurement/${proc.procId}/proforma-file`, { method: "POST", body: fd });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Upload failed");
+      const doc = await res.json();
+      setProformaFile(doc.proformaFile || null);
+      if (onUploaded) onUploaded(doc);
+    } catch (e) { window.alert(e.message || "Could not upload the proforma invoice."); }
+    setUploadingPF(false);
+  };
+
+  const removeProforma = async () => {
+    try {
+      const res = await fetch(`${window.API}/procurement/${proc.procId}/proforma-file`, { method: "DELETE" });
+      const doc = await res.json();
+      setProformaFile(null);
+      if (onUploaded) onUploaded(doc);
+    } catch (e) { console.error(e); }
+  };
 
   const handleConfirm = async () => {
     setSaving(true);
@@ -363,12 +391,42 @@ function AdvanceModal({ proc, onClose, onConfirm }) {
       </div>
     );
     if (proc.currentStage === "proforma") return (
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div className="form-row"><label className="form-label">Invoice / Proforma No.</label>
-          <input className="form-input" placeholder="INV-0001" onChange={setP("invoiceNumber")} /></div>
-        <div className="form-row"><label className="form-label">Invoice Amount (AED)</label>
-          <input className="form-input" type="number" min="0" placeholder="0" onChange={setP("invoiceAmount")} /></div>
-      </div>
+      <>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="form-row"><label className="form-label">Invoice / Proforma No.</label>
+            <input className="form-input" placeholder="INV-0001" onChange={setP("invoiceNumber")} /></div>
+          <div className="form-row"><label className="form-label">Invoice Amount (AED)</label>
+            <input className="form-input" type="number" min="0" placeholder="0" onChange={setP("invoiceAmount")} /></div>
+        </div>
+        <div className="form-row">
+          <label className="form-label">Proforma Invoice Document</label>
+          {proformaFile ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8,
+              border: "1px solid #D6F0E0", background: "#F0FAF4" }}>
+              <Icon name="paperclip" size={14} color="#1F8A52" />
+              <a href={FILE_BASE + proformaFile.filePath} target="_blank" rel="noreferrer" title={proformaFile.fileName}
+                style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, color: "#1F8A52", textDecoration: "none",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{proformaFile.fileName}</a>
+              {proformaFile.fileSizeMB > 0 && <span style={{ fontSize: 11, color: "var(--fg-3)" }}>{proformaFile.fileSizeMB} MB</span>}
+              <button title="Remove" onClick={removeProforma}
+                style={{ width: 22, height: 22, borderRadius: 5, border: "none", background: "transparent", cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Icon name="x" size={12} color="#C0263A" />
+              </button>
+            </div>
+          ) : (
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "9px 11px",
+              borderRadius: 8, border: "1px dashed var(--border-strong)", cursor: uploadingPF ? "default" : "pointer",
+              fontSize: 12.5, fontWeight: 600, color: uploadingPF ? "var(--fg-4)" : "var(--brand-burgundy)", background: "var(--bg-surface)" }}>
+              <Icon name={uploadingPF ? "loader" : "upload"} size={14} />
+              <span>{uploadingPF ? "Uploading…" : "Attach proforma invoice (PDF, image, Excel…)"}</span>
+              <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic,.webp" disabled={uploadingPF}
+                style={{ display: "none" }}
+                onChange={e => { const f = e.target.files[0]; e.target.value = ""; uploadProforma(f); }} />
+            </label>
+          )}
+        </div>
+      </>
     );
     if (proc.currentStage === "payment_release") return (
       <>
@@ -455,6 +513,67 @@ function ItemsPage({ proc, onBack, onSave }) {
   const totals = itemsTotals(rows);
   const cats = itemsByCategory(rows);
 
+  // Export the Material & Labour list as a PDF (jsPDF + autotable, loaded in index.html).
+  const downloadPdf = () => {
+    if (!(window.jspdf && window.jspdf.jsPDF)) { window.alert("PDF library not loaded — check your connection."); return; }
+    const clean = rows.filter(r => (r.description || "").trim() || lineAmount(r) > 0);
+    if (!clean.length) { window.alert("Add at least one line item before exporting."); return; }
+
+    const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" });
+    const W = doc.internal.pageSize.getWidth(); const M = 40;
+
+    // Header
+    doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(111, 25, 71);
+    doc.text("Meridian ERP", M, 52);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+    doc.text("Meridian Logistics DMCC · Dubai, UAE", M, 66);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(111, 25, 71);
+    doc.text("MATERIAL & LABOUR LIST", W - M, 50, { align: "right" });
+    doc.setFontSize(11); doc.setTextColor(35, 31, 32);
+    doc.text(String(proc.procId || ""), W - M, 67, { align: "right" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+    doc.text(new Date().toISOString().slice(0, 10), W - M, 81, { align: "right" });
+    doc.setDrawColor(111, 25, 71); doc.setLineWidth(2); doc.line(M, 92, W - M, 92);
+
+    doc.setFontSize(10); doc.setTextColor(35, 31, 32);
+    doc.text(doc.splitTextToSize("Project: " + String(proc.title || "—"), W - 2 * M), M, 112);
+
+    const body = clean.map((r, n) => [
+      String(n + 1), r.category || "", r.description || "", r.unit || "", String(Number(r.qty) || 0),
+      AED(Number(r.unitPrice != null ? r.unitPrice : r.estPrice) || 0), AED(lineAmount(r)),
+      AED(Number(r.targetRate) || 0), AED(lineTarget(r)),
+    ]);
+    doc.autoTable({
+      startY: 124,
+      head: [["SL", "Category", "Description", "Unit", "Qty", "Rate", "Amount", "Budget Rate", "Budget Amt"]],
+      body,
+      styles: { fontSize: 8.5, cellPadding: 4, lineColor: [221, 221, 221], lineWidth: 0.5 },
+      headStyles: { fillColor: [243, 238, 241], textColor: [85, 85, 85], fontStyle: "bold" },
+      columnStyles: { 0: { halign: "center", cellWidth: 22 }, 4: { halign: "right", cellWidth: 34 },
+        5: { halign: "right", cellWidth: 60 }, 6: { halign: "right", cellWidth: 66 },
+        7: { halign: "right", cellWidth: 60 }, 8: { halign: "right", cellWidth: 66 } },
+      margin: { left: M, right: M },
+    });
+
+    let fy = (doc.lastAutoTable ? doc.lastAutoTable.finalY : 200) + 18;
+    const lx = W - M - 230, vx = W - M;
+    const line = (label, val, opts = {}) => {
+      doc.setFont("helvetica", opts.bold ? "bold" : "normal"); doc.setFontSize(opts.bold ? 11 : 10);
+      doc.setTextColor(opts.green ? 31 : 35, opts.green ? 138 : 31, opts.green ? 82 : 32);
+      doc.text(label, lx, fy); doc.text(AED(val), vx, fy, { align: "right" }); fy += opts.gap || 15;
+    };
+    line("Subtotal (ex. VAT)", totals.subtotal);
+    line("VAT (5%)", totals.vat);
+    doc.setDrawColor(111, 25, 71); doc.setLineWidth(1); doc.line(lx, fy - 4, vx, fy - 4); fy += 6;
+    line("Grand Total", totals.grand, { bold: true, green: true });
+    if (totals.budget > 0) {
+      line("Budget (target)", totals.budget);
+      line("Variance vs budget", totals.variance);
+    }
+
+    doc.save(`Material_Labour_List_${String(proc.procId || "").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`);
+  };
+
   const persist = async (applyTotal) => {
     const clean = rows
       .filter(r => (r.description || "").trim() || lineAmount(r) > 0)
@@ -497,7 +616,8 @@ function ItemsPage({ proc, onBack, onSave }) {
             <span style={{ fontFamily: "monospace" }}>{proc.procId}</span> · {proc.title}
           </div>
         </div>
-        <div className="row">
+        <div className="row" style={{ gap: 8 }}>
+          <Button variant="secondary" icon="download" onClick={downloadPdf}>Download PDF</Button>
           <Button variant="ghost" icon="arrow-left" onClick={onBack}>Back to Lifecycle</Button>
         </div>
       </div>
@@ -639,8 +759,43 @@ function ItemsPage({ proc, onBack, onSave }) {
 // ── Vendor quote comparison — per-category vendor tables (step 4) ────────────────
 // Each work category (trade) has its OWN vendor columns (min 3), its own per-line
 // rates and its own award — like separate trade quotation sheets.
-function QuotesPage({ proc, onBack, onSave, onManageItems }) {
+function QuotesPage({ proc, onBack, onSave, onUploaded, onManageItems }) {
   const baseItems = proc.items || [];
+
+  // Attached vendor quote docs, read live from the (refreshed) proc prop.
+  const FILE_BASE = (window.API || "").replace(/\/api$/, "");
+  const quoteFiles = proc.quoteFiles || [];
+  const quoteFileFor = (cat, vendor) =>
+    quoteFiles.find(q => q.category === cat && q.vendor === vendor) || null;
+
+  // Tracks which (category|vendor) cell is currently uploading, for spinner state.
+  const [uploading, setUploading] = useStatePR("");
+
+  const uploadQuoteFile = async (cat, vendor, file) => {
+    if (!file || !(vendor || "").trim()) return;
+    const key = cat + "|" + vendor;
+    setUploading(key);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("category", cat);
+      fd.append("vendor", vendor);
+      const res = await fetch(`${window.API}/procurement/${proc.procId}/quote-file`, { method: "POST", body: fd });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Upload failed");
+      const doc = await res.json();
+      if (onUploaded) onUploaded(doc);
+    } catch (e) { window.alert(e.message || "Could not upload the quote file."); }
+    setUploading("");
+  };
+
+  const removeQuoteFile = async (cat, vendor) => {
+    if (!window.confirm(`Remove the attached quote for ${vendor}?`)) return;
+    try {
+      const res = await fetch(`${window.API}/procurement/${proc.procId}/quote-file?category=${encodeURIComponent(cat)}&vendor=${encodeURIComponent(vendor)}`, { method: "DELETE" });
+      const doc = await res.json();
+      if (onUploaded) onUploaded(doc);
+    } catch (e) { console.error(e); }
+  };
 
   // Group line indices by category (first-seen order).
   const groups = (() => {
@@ -697,6 +852,128 @@ function QuotesPage({ proc, onBack, onSave, onManageItems }) {
   const namedCount = c => (catVendors[c] || []).filter(v => (v || "").trim()).length;
   const colSubCat  = (cat, j) => idxsOf(cat).reduce((s, i) => s + qtyOf(i) * (Number(rates[i][j]) || 0), 0);
 
+  // Export the comparison as a PDF — one rate/amount table per category (landscape),
+  // followed by the overall award summary. Pass a category name to export just that
+  // one trade sheet. Uses jsPDF + autotable (loaded in index.html).
+  const downloadPdf = (onlyCat) => {
+    if (!(window.jspdf && window.jspdf.jsPDF)) { window.alert("PDF library not loaded — check your connection."); return; }
+    if (!baseItems.length) { window.alert("Build the Material & Labour list first."); return; }
+    const renderGroups = onlyCat ? groups.filter(g => g.cat === onlyCat) : groups;
+    if (!renderGroups.length) return;
+
+    const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+    const W = doc.internal.pageSize.getWidth(); const PH = doc.internal.pageSize.getHeight(); const M = 30;
+
+    doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(111, 25, 71);
+    doc.text("Meridian ERP", M, 46);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+    doc.text("Meridian Logistics DMCC · Dubai, UAE", M, 59);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(111, 25, 71);
+    doc.text(onlyCat ? "VENDOR QUOTE — " + onlyCat.toUpperCase() : "VENDOR QUOTE COMPARISON", W - M, 44, { align: "right" });
+    doc.setFontSize(10); doc.setTextColor(35, 31, 32);
+    doc.text(String(proc.procId || ""), W - M, 59, { align: "right" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(120, 120, 120);
+    doc.text(new Date().toISOString().slice(0, 10), W - M, 72, { align: "right" });
+    doc.setDrawColor(111, 25, 71); doc.setLineWidth(1.5); doc.line(M, 82, W - M, 82);
+    doc.setFontSize(9.5); doc.setTextColor(35, 31, 32);
+    doc.text(doc.splitTextToSize("Project: " + String(proc.title || "—"), W - 2 * M), M, 98);
+
+    let startY = 112;
+
+    renderGroups.forEach(g => {
+      const vIdx = (catVendors[g.cat] || []).map((v, j) => ({ v: (v || "").trim(), j })).filter(x => x.v);
+      const award = catAward[g.cat];
+      const budgetSub = g.idxs.reduce((s, i) => s + qtyOf(i) * (Number(baseItems[i].targetRate) || 0), 0);
+
+      if (startY > PH - 120) { doc.addPage(); startY = 50; }
+
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); doc.setTextColor(111, 25, 71);
+      doc.text(g.cat.toUpperCase(), M, startY);
+      if (award != null && award >= 0 && (catVendors[g.cat] || [])[award]) {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(31, 138, 82);
+        doc.text("AWARDED → " + catVendors[g.cat][award], M + 170, startY);
+      }
+
+      // Two-row header: fixed cols rowSpan 2, then Budget + each vendor span 2 (Rate, Amount).
+      const headRow1 = [
+        { content: "SL", rowSpan: 2 }, { content: "Description", rowSpan: 2 },
+        { content: "Unit", rowSpan: 2 }, { content: "Qty", rowSpan: 2 },
+        { content: "Budget", colSpan: 2, styles: { halign: "center" } },
+      ];
+      vIdx.forEach(x => headRow1.push({ content: x.v, colSpan: 2, styles: { halign: "center" } }));
+      const headRow2 = ["Rate", "Amount"];
+      vIdx.forEach(() => { headRow2.push("Rate", "Amount"); });
+
+      const body = g.idxs.map((i, n) => {
+        const qty = qtyOf(i); const it = baseItems[i];
+        const row = [String(n + 1), it.description || "", it.unit || "", String(qty),
+          AED(Number(it.targetRate) || 0), AED(qty * (Number(it.targetRate) || 0))];
+        vIdx.forEach(x => { const rate = Number(rates[i][x.j]) || 0; row.push(AED(rate), AED(qty * rate)); });
+        return row;
+      });
+
+      // Totals rows (label spans the 4 fixed columns).
+      const mkTotal = (label, budgetVal, perVendor, opts = {}) => {
+        const r = [{ content: label, colSpan: 4, styles: { halign: "right", fontStyle: opts.bold ? "bold" : "normal" } },
+          { content: "", styles: {} }, { content: AED(budgetVal), styles: { halign: "right", fontStyle: opts.bold ? "bold" : "normal" } }];
+        vIdx.forEach((x, k) => r.push({ content: "", styles: {} },
+          { content: AED(perVendor[k]), styles: { halign: "right", fontStyle: opts.bold ? "bold" : "normal", textColor: (opts.bold && award === x.j) ? [31, 138, 82] : [35, 31, 32] } }));
+        return r;
+      };
+      const subs  = vIdx.map(x => colSubCat(g.cat, x.j));
+      body.push(mkTotal("Total (ex VAT)", budgetSub, subs));
+      body.push(mkTotal("VAT (5%)", budgetSub * VAT_RATE, subs.map(s => s * VAT_RATE)));
+      body.push(mkTotal("Grand Total", budgetSub * (1 + VAT_RATE), subs.map(s => s * (1 + VAT_RATE)), { bold: true }));
+
+      doc.autoTable({
+        startY: startY + 8,
+        head: [headRow1, headRow2],
+        body,
+        styles: { fontSize: 8, cellPadding: 3, lineColor: [221, 221, 221], lineWidth: 0.5, overflow: "linebreak" },
+        headStyles: { fillColor: [243, 238, 241], textColor: [85, 85, 85], fontStyle: "bold", halign: "center" },
+        columnStyles: { 0: { halign: "center", cellWidth: 20 }, 1: { cellWidth: 150 }, 2: { halign: "center", cellWidth: 34 },
+          3: { halign: "right", cellWidth: 30 }, 4: { halign: "right" }, 5: { halign: "right" } },
+        margin: { left: M, right: M },
+        tableWidth: "auto",
+      });
+      startY = (doc.lastAutoTable ? doc.lastAutoTable.finalY : startY + 60) + 22;
+    });
+
+    // Award summary — only on the full export (per-category sheets show their own totals).
+    if (!onlyCat) {
+    const sumRows = groups.map(g => {
+      const aj = catAward[g.cat]; const vlist = catVendors[g.cat] || []; const awarded = (aj != null && aj >= 0);
+      return { cat: g.cat, vendor: awarded ? (vlist[aj] || "") : "",
+        budget: g.idxs.reduce((s, i) => s + qtyOf(i) * (Number(baseItems[i].targetRate) || 0), 0),
+        amount: awarded ? g.idxs.reduce((s, i) => s + qtyOf(i) * (Number(rates[i][aj]) || 0), 0) : 0 };
+    });
+    const awSub = sumRows.reduce((s, r) => s + r.amount, 0);
+    const awBudget = sumRows.reduce((s, r) => s + r.budget, 0);
+    if (startY > PH - 140) { doc.addPage(); startY = 50; }
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(111, 25, 71);
+    doc.text("AWARD SUMMARY", M, startY);
+    doc.autoTable({
+      startY: startY + 8,
+      head: [["Category", "Awarded Vendor", "Budget", "Awarded Amount"]],
+      body: sumRows.map(r => [r.cat, r.vendor || "— not awarded —", AED(r.budget), r.vendor ? AED(r.amount) : "—"]),
+      foot: [
+        [{ content: "Subtotal (awarded)", colSpan: 2, styles: { halign: "right" } }, AED(awBudget), AED(awSub)],
+        [{ content: "VAT (5%)", colSpan: 3, styles: { halign: "right" } }, AED(awSub * VAT_RATE)],
+        [{ content: "Grand Total (incl. VAT)", colSpan: 3, styles: { halign: "right", fontStyle: "bold" } },
+          { content: AED(awSub * (1 + VAT_RATE)), styles: { fontStyle: "bold", textColor: [31, 138, 82] } }],
+      ],
+      styles: { fontSize: 9, cellPadding: 4, lineColor: [221, 221, 221], lineWidth: 0.5 },
+      headStyles: { fillColor: [243, 238, 241], textColor: [85, 85, 85], fontStyle: "bold" },
+      footStyles: { fillColor: [248, 246, 247], textColor: [35, 31, 32] },
+      columnStyles: { 2: { halign: "right" }, 3: { halign: "right" } },
+      margin: { left: M, right: M },
+    });
+    }
+
+    const catTag = onlyCat ? "_" + onlyCat.replace(/[^a-zA-Z0-9_-]/g, "_") : "";
+    doc.save(`Vendor_Comparison_${String(proc.procId || "").replace(/[^a-zA-Z0-9_-]/g, "_")}${catTag}.pdf`);
+  };
+
   const persist = async () => {
     const categoryVendors = groups.map(g => ({ category: g.cat, vendors: (catVendors[g.cat] || []).map(v => (v || "").trim()) }));
     const newItems = baseItems.map((it, i) => {
@@ -752,6 +1029,7 @@ function QuotesPage({ proc, onBack, onSave, onManageItems }) {
         <div style={{ fontSize: 11.5, fontWeight: 600, padding: "5px 11px", borderRadius: 6, background: "var(--ink-50)", color: "var(--fg-2)" }}>
           {groups.length} categor{groups.length === 1 ? "y" : "ies"}
         </div>
+        <Button variant="secondary" icon="download" onClick={() => downloadPdf()}>Download PDF</Button>
         <Button variant="ghost" icon="arrow-left" onClick={onBack}>Back to Lifecycle</Button>
       </div>
     </div>
@@ -783,7 +1061,10 @@ function QuotesPage({ proc, onBack, onSave, onManageItems }) {
         const vends = catVendors[g.cat] || [];
         const totals = vends.map((v, j) => { const sub = colSubCat(g.cat, j); return { sub, vat: sub * VAT_RATE, grand: sub * (1 + VAT_RATE) }; });
         const budget = g.idxs.reduce((s, i) => s + qtyOf(i) * (Number(baseItems[i].targetRate) || 0), 0);
-        const lowestIdx = (() => { let idx = -1, min = Infinity; totals.forEach((t, j) => { if (t.sub > 0 && t.grand < min) { min = t.grand; idx = j; } }); return idx; })();
+        // Rank the quoted vendor columns by grand total to flag the 1st and 2nd cheapest.
+        const ranked = totals.map((t, j) => ({ j, grand: t.grand, sub: t.sub })).filter(t => t.sub > 0).sort((a, b) => a.grand - b.grand);
+        const lowestIdx       = ranked.length     ? ranked[0].j : -1;
+        const secondLowestIdx = ranked.length > 1 ? ranked[1].j : -1;
         const award = catAward[g.cat];
         const nm = namedCount(g.cat);
         const totalRow = (label, budgetVal, vendorVals, opts = {}) => (
@@ -791,12 +1072,16 @@ function QuotesPage({ proc, onBack, onSave, onManageItems }) {
             <td colSpan={4} style={{ ...num, fontSize: opts.bold ? 12.5 : 11.5, color: "var(--fg-2)" }}>{label}</td>
             <td style={cell} />
             <td style={{ ...num, fontSize: 12 }}>{AED(budgetVal)}</td>
-            {vends.map((v, j) => (
-              <React.Fragment key={j}>
-                <td style={{ ...cell, borderLeft: "2px solid var(--border-subtle)" }} />
-                <td style={{ ...num, fontSize: 12, color: award === j ? "#1F8A52" : "var(--fg-1)" }}>{AED(vendorVals[j])}</td>
-              </React.Fragment>
-            ))}
+            {vends.map((v, j) => {
+              const over = budgetVal > 0 && vendorVals[j] > budgetVal;
+              return (
+                <React.Fragment key={j}>
+                  <td style={{ ...cell, borderLeft: "2px solid var(--border-subtle)" }} />
+                  <td style={{ ...num, fontSize: 12, color: over ? "#C0263A" : award === j ? "#1F8A52" : "var(--fg-1)" }}
+                    title={over ? "Over budget" : undefined}>{AED(vendorVals[j])}</td>
+                </React.Fragment>
+              );
+            })}
           </tr>
         );
         return (
@@ -807,12 +1092,13 @@ function QuotesPage({ proc, onBack, onSave, onManageItems }) {
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--brand-burgundy)", textTransform: "uppercase", letterSpacing: ".04em" }}>{g.cat}</span>
                 {award != null && award >= 0 && vends[award] && (
-                  <span style={{ fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "#1F8A5218", color: "#1F8A52" }}>AWARDED → {vends[award]}</span>
+                  <span style={{ fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "#6D28D918", color: "#6D28D9" }}>AWARDED → {vends[award]}</span>
                 )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6,
                   background: nm >= 3 ? "#ECFDF5" : "#FEF8EC", color: nm >= 3 ? "#1F8A52" : "#9A6A11" }}>{nm >= 3 ? `${nm} vendors` : `${nm} of min. 3`}</span>
+                <button className="btn btn-sm" onClick={() => downloadPdf(g.cat)} title={`Download the ${g.cat} comparison as PDF`}><Icon name="download" size={12} /> PDF</button>
                 <button className="btn btn-sm" onClick={() => addVendor(g.cat)}><Icon name="plus" size={12} /> Add vendor</button>
               </div>
             </div>
@@ -842,9 +1128,44 @@ function QuotesPage({ proc, onBack, onSave, onManageItems }) {
                           )}
                         </div>
                         <div style={{ fontSize: 9.5, fontWeight: 700, marginTop: 4, textTransform: "none", letterSpacing: 0,
-                          color: lowestIdx === j ? "#1F8A52" : "var(--fg-3)" }}>
-                          {totals[j].sub > 0 ? AED(totals[j].grand) + (lowestIdx === j ? " · LOWEST" : "") : "—"}
+                          color: lowestIdx === j ? "#1F8A52" : secondLowestIdx === j ? "#2563B0" : "var(--fg-3)" }}>
+                          {totals[j].sub > 0 ? AED(totals[j].grand) + (lowestIdx === j ? " · LOWEST" : secondLowestIdx === j ? " · 2ND LOWEST" : "") : "—"}
                         </div>
+                        {/* Attached vendor quote document */}
+                        {(() => {
+                          const vname = (vends[j] || "").trim();
+                          if (!vname) return null;
+                          const qf  = quoteFileFor(g.cat, vname);
+                          const key = g.cat + "|" + vname;
+                          const busy = uploading === key;
+                          if (qf) return (
+                            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 5, textTransform: "none", letterSpacing: 0 }}>
+                              <a href={FILE_BASE + qf.filePath} target="_blank" rel="noreferrer" title={qf.fileName}
+                                style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 600, color: "#1F8A52",
+                                  textDecoration: "none", maxWidth: 140, overflow: "hidden" }}>
+                                <Icon name="paperclip" size={11} color="#1F8A52" />
+                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{qf.fileName}</span>
+                              </a>
+                              <button title="Remove quote" onClick={() => removeQuoteFile(g.cat, vname)}
+                                style={{ width: 18, height: 18, borderRadius: 4, border: "none", background: "transparent", cursor: "pointer",
+                                  display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                <Icon name="x" size={10} color="#C0263A" />
+                              </button>
+                            </div>
+                          );
+                          return (
+                            <label title="Attach this vendor's quotation (PDF, image, Excel…)"
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 5, fontSize: 10.5, fontWeight: 600,
+                                color: busy ? "var(--fg-4)" : "var(--brand-burgundy)", cursor: busy ? "default" : "pointer",
+                                textTransform: "none", letterSpacing: 0 }}>
+                              <Icon name={busy ? "loader" : "paperclip"} size={11} />
+                              <span>{busy ? "Uploading…" : "Attach quote"}</span>
+                              <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic,.webp" disabled={busy}
+                                style={{ display: "none" }}
+                                onChange={e => { const f = e.target.files[0]; e.target.value = ""; uploadQuoteFile(g.cat, vname, f); }} />
+                            </label>
+                          );
+                        })()}
                       </th>
                     ))}
                   </tr>
@@ -873,12 +1194,15 @@ function QuotesPage({ proc, onBack, onSave, onManageItems }) {
                         <td style={{ ...num, color: "var(--fg-3)" }}>{AED(qty * (Number(it.targetRate) || 0))}</td>
                         {vends.map((v, j) => {
                           const rate = Number(rates[i][j]) || 0;
+                          const budgetLine = qty * (Number(it.targetRate) || 0);
+                          const over = budgetLine > 0 && rate > 0 && (qty * rate) > budgetLine;
                           return (
                             <React.Fragment key={j}>
                               <td style={{ ...cell, borderLeft: "2px solid var(--border-subtle)" }}>
                                 <input className="form-input" type="number" min="0" style={inp} value={rates[i][j]} onChange={e => setRate(i, j, e.target.value)} />
                               </td>
-                              <td style={{ ...num, fontWeight: 600, background: award === j ? "#EAF7EF" : "transparent" }}>{AED(qty * rate)}</td>
+                              <td style={{ ...num, fontWeight: 600, background: award === j ? "#EAF7EF" : "transparent", color: over ? "#C0263A" : "var(--fg-1)" }}
+                                title={over ? "Over budget rate" : undefined}>{AED(qty * rate)}</td>
                             </React.Fragment>
                           );
                         })}
@@ -1090,12 +1414,11 @@ function POPage({ proc, onBack, onSave, onCompare }) {
     if (w) { w.document.write(html); w.document.close(); }
   };
 
-  // Build & download a real PDF file via jsPDF (falls back to print if lib missing).
-  const downloadPO = po => {
-    if (!(window.jspdf && window.jspdf.jsPDF)) return printPO(po);
+  // Render one Local Purchase Order onto an existing jsPDF doc (no save). Shared by
+  // the single-PO download and the combined "all LPOs" export.
+  const renderPO = (doc, po) => {
     const mv = meta[po.vendor];
     const ct = contactFor(po.vendor);
-    const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" });
     const W = doc.internal.pageSize.getWidth();
     const M = 40;
 
@@ -1146,8 +1469,68 @@ function POPage({ proc, onBack, onSave, onCompare }) {
     doc.setDrawColor(150, 150, 150); doc.setLineWidth(0.5);
     doc.line(M, sy, M + 160, sy); doc.text("Procurement Dept.", M, sy + 13);
     doc.line(W - M - 160, sy, W - M, sy); doc.text("Authorised Signature", W - M - 160, sy + 13);
+  };
 
-    doc.save(`${String(mv.poNumber || "PO").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`);
+  // Single PO download (falls back to printable HTML if the PDF lib is missing).
+  const downloadPO = po => {
+    if (!(window.jspdf && window.jspdf.jsPDF)) return printPO(po);
+    const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" });
+    renderPO(doc, po);
+    doc.save(`${String((meta[po.vendor] || {}).poNumber || "PO").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`);
+  };
+
+  // Combined export — a single summary sheet listing every awarded vendor's LPO,
+  // with a grand total across all POs (not the individual full POs).
+  const downloadAllPOs = () => {
+    if (!pos.length) { window.alert("No awarded vendors yet — award categories in the comparison first."); return; }
+    if (!(window.jspdf && window.jspdf.jsPDF)) { window.alert("PDF library not loaded — check your connection."); return; }
+    const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" });
+    const W = doc.internal.pageSize.getWidth(); const M = 40;
+
+    doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(111, 25, 71);
+    doc.text("Meridian ERP", M, 52);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+    doc.text("Meridian Logistics DMCC · Dubai, UAE", M, 66);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(111, 25, 71);
+    doc.text("LPO SUMMARY", W - M, 50, { align: "right" });
+    doc.setFontSize(10); doc.setTextColor(35, 31, 32);
+    doc.text(String(proc.procId || ""), W - M, 67, { align: "right" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+    doc.text(new Date().toISOString().slice(0, 10), W - M, 81, { align: "right" });
+    doc.setDrawColor(111, 25, 71); doc.setLineWidth(2); doc.line(M, 92, W - M, 92);
+
+    doc.setFontSize(10); doc.setTextColor(35, 31, 32);
+    doc.text(doc.splitTextToSize("Project: " + String(proc.title || "—"), W - 2 * M), M, 112);
+
+    const gSub = pos.reduce((s, po) => s + po.subtotal, 0);
+    const gVat = pos.reduce((s, po) => s + po.vat, 0);
+    const gTot = pos.reduce((s, po) => s + po.total, 0);
+
+    const body = pos.map((po, i) => [
+      String(i + 1), (meta[po.vendor] || {}).poNumber || "", po.vendor,
+      po.categories.join(", "), AED(po.subtotal), AED(po.vat), AED(po.total),
+    ]);
+    doc.autoTable({
+      startY: 126,
+      head: [["SL", "LPO No.", "Vendor", "Categories", "Subtotal", "VAT (5%)", "Total"]],
+      body,
+      foot: [[{ content: "Grand Total (all LPOs)", colSpan: 4, styles: { halign: "right", fontStyle: "bold" } },
+        AED(gSub), AED(gVat), { content: AED(gTot), styles: { fontStyle: "bold", textColor: [31, 138, 82] } }]],
+      styles: { fontSize: 9, cellPadding: 5, lineColor: [221, 221, 221], lineWidth: 0.5 },
+      headStyles: { fillColor: [243, 238, 241], textColor: [85, 85, 85], fontStyle: "bold" },
+      footStyles: { fillColor: [248, 246, 247], textColor: [35, 31, 32] },
+      columnStyles: { 0: { halign: "center", cellWidth: 26 }, 4: { halign: "right", cellWidth: 72 },
+        5: { halign: "right", cellWidth: 64 }, 6: { halign: "right", cellWidth: 80 } },
+      margin: { left: M, right: M },
+    });
+
+    let fy = (doc.lastAutoTable ? doc.lastAutoTable.finalY : 200) + 40;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+    doc.setDrawColor(150, 150, 150); doc.setLineWidth(0.5);
+    doc.line(M, fy, M + 160, fy); doc.text("Procurement Dept.", M, fy + 13);
+    doc.line(W - M - 160, fy, W - M, fy); doc.text("Authorised Signature", W - M - 160, fy + 13);
+
+    doc.save(`LPO_Summary_${String(proc.procId || "").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`);
   };
 
   const persist = async () => {
@@ -1186,7 +1569,14 @@ function POPage({ proc, onBack, onSave, onCompare }) {
           <span style={{ fontFamily: "monospace" }}>{proc.procId}</span> · {proc.title}
         </div>
       </div>
-      <div className="row"><Button variant="ghost" icon="arrow-left" onClick={onBack}>Back to Lifecycle</Button></div>
+      <div className="row" style={{ gap: 8 }}>
+        {pos.length > 0 && (
+          <Button variant="secondary" icon="download" onClick={downloadAllPOs}>
+            Download Summary{pos.length > 1 ? ` (${pos.length} LPOs)` : ""}
+          </Button>
+        )}
+        <Button variant="ghost" icon="arrow-left" onClick={onBack}>Back to Lifecycle</Button>
+      </div>
     </div>
   );
 
@@ -1461,6 +1851,64 @@ function PaymentAppPage({ proc, onBack, onSave, onIssuePOs }) {
     doc.save(`${String(mv.appNumber || "PaymentApp").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`);
   };
 
+  // Combined export — a single summary sheet across all vendors' payment applications,
+  // with a grand total of the current payment due.
+  const downloadAllPay = () => {
+    if (!pos.length) { window.alert("No awarded vendors yet — issue the LPOs first."); return; }
+    if (!(window.jspdf && window.jspdf.jsPDF)) { window.alert("PDF library not loaded — check your connection."); return; }
+    const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" });
+    const W = doc.internal.pageSize.getWidth(); const M = 40;
+
+    doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(111, 25, 71);
+    doc.text("Meridian ERP", M, 52);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+    doc.text("Meridian Logistics DMCC · Dubai, UAE", M, 66);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(111, 25, 71);
+    doc.text("PAYMENT APPLICATIONS — SUMMARY", W - M, 50, { align: "right" });
+    doc.setFontSize(10); doc.setTextColor(35, 31, 32);
+    doc.text(String(proc.procId || ""), W - M, 67, { align: "right" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+    doc.text(new Date().toISOString().slice(0, 10), W - M, 81, { align: "right" });
+    doc.setDrawColor(111, 25, 71); doc.setLineWidth(2); doc.line(M, 92, W - M, 92);
+
+    doc.setFontSize(10); doc.setTextColor(35, 31, 32);
+    doc.text(doc.splitTextToSize("Project: " + String(proc.title || "—"), W - 2 * M), M, 112);
+
+    const computed = pos.map(po => ({ po, mv: meta[po.vendor], c: compute(po) }));
+    const gContract  = computed.reduce((s, x) => s + x.c.totalContract, 0);
+    const gCompleted = computed.reduce((s, x) => s + x.c.completedToDate, 0);
+    const gPrev      = computed.reduce((s, x) => s + x.c.lessPrevious, 0);
+    const gDue       = computed.reduce((s, x) => s + x.c.currentDue, 0);
+
+    const body = computed.map((x, i) => [
+      String(i + 1), x.mv.appNumber || "", x.po.vendor,
+      poByVendor[x.po.vendor] ? poByVendor[x.po.vendor].poNumber : "—",
+      AED(x.c.totalContract), AED(x.c.completedToDate), AED(x.c.lessPrevious), AED(x.c.currentDue),
+    ]);
+    doc.autoTable({
+      startY: 126,
+      head: [["SL", "App No.", "Vendor", "PO / WO", "Contract", "Completed", "Less Prev.", "Current Due"]],
+      body,
+      foot: [[{ content: "Grand Total", colSpan: 4, styles: { halign: "right", fontStyle: "bold" } },
+        AED(gContract), AED(gCompleted), AED(gPrev), { content: AED(gDue), styles: { fontStyle: "bold", textColor: [31, 138, 82] } }]],
+      styles: { fontSize: 8.5, cellPadding: 5, lineColor: [221, 221, 221], lineWidth: 0.5 },
+      headStyles: { fillColor: [243, 238, 241], textColor: [85, 85, 85], fontStyle: "bold" },
+      footStyles: { fillColor: [248, 246, 247], textColor: [35, 31, 32] },
+      columnStyles: { 0: { halign: "center", cellWidth: 24 }, 4: { halign: "right" }, 5: { halign: "right" },
+        6: { halign: "right" }, 7: { halign: "right" } },
+      margin: { left: M, right: M },
+    });
+
+    let fy = (doc.lastAutoTable ? doc.lastAutoTable.finalY : 200) + 40;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(120, 120, 120);
+    doc.setDrawColor(150, 150, 150); doc.setLineWidth(0.5);
+    doc.line(M, fy, M + 150, fy); doc.text("Procurement Dept.", M, fy + 13);
+    doc.line(M + 200, fy, M + 350, fy); doc.text("Accounts Dept.", M + 200, fy + 13);
+    doc.line(W - M - 150, fy, W - M, fy); doc.text("Engineer / PM", W - M - 150, fy + 13);
+
+    doc.save(`Payment_Applications_Summary_${String(proc.procId || "").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`);
+  };
+
   const persist = async () => {
     const paymentApplications = pos.map(po => {
       const mv = meta[po.vendor]; const c = compute(po);
@@ -1494,7 +1942,7 @@ function PaymentAppPage({ proc, onBack, onSave, onIssuePOs }) {
             <Icon name="arrow-left" size={13} /> Procurement Lifecycle
           </button>
           <span style={{ color: "var(--fg-4)" }}>/</span>
-          <span>Step 7 · Payment Application</span>
+          <span>Step 8 · Payment Application</span>
         </div>
         <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Icon name="file-plus" size={20} /> Application for Payment
@@ -1503,7 +1951,14 @@ function PaymentAppPage({ proc, onBack, onSave, onIssuePOs }) {
           <span style={{ fontFamily: "monospace" }}>{proc.procId}</span> · {proc.title}
         </div>
       </div>
-      <div className="row"><Button variant="ghost" icon="arrow-left" onClick={onBack}>Back to Lifecycle</Button></div>
+      <div className="row" style={{ gap: 8 }}>
+        {pos.length > 0 && (
+          <Button variant="secondary" icon="download" onClick={downloadAllPay}>
+            Download Summary{pos.length > 1 ? ` (${pos.length} apps)` : ""}
+          </Button>
+        )}
+        <Button variant="ghost" icon="arrow-left" onClick={onBack}>Back to Lifecycle</Button>
+      </div>
     </div>
   );
 
@@ -1738,9 +2193,9 @@ function PaymentAppPage({ proc, onBack, onSave, onIssuePOs }) {
   );
 }
 
-// ── Detail pane with the vertical 12-step lifecycle ─────────────────────────────
+// ── Detail pane with the vertical 11-step lifecycle ─────────────────────────────
 function ProcDetailPane({ proc, onClose, onEdit, onDelete, onAdvance, onSetStage, onManageItems, onCompareQuotes, onManagePOs, onManagePayApps, onSetStatus }) {
-  const curIdx = stageIndex(proc.currentStage);
+  const curIdx = procStageIndex(proc.currentStage);
   const st = STATUS_META[proc.status] || STATUS_META.in_progress;
 
   // Finance records booked against the same project (shown when linked):
@@ -2079,7 +2534,7 @@ function ProcDetailPane({ proc, onClose, onEdit, onDelete, onAdvance, onSetStage
 
       <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
         color: "var(--fg-3)", marginBottom: 12 }}>
-        Lifecycle · Stage {Math.min(curIdx + 1, 12)} of 12
+        Lifecycle · Stage {Math.min(curIdx + 1, STAGE_KEYS.length)} of {STAGE_KEYS.length}
       </div>
 
       {/* Vertical stepper */}
@@ -2097,9 +2552,9 @@ function ProcDetailPane({ proc, onClose, onEdit, onDelete, onAdvance, onSetStage
             stage.key === "lpo"                 ? { label: "Issue LPOs",         icon: "file-output", on: () => onManagePOs(proc) } :
             stage.key === "payment_application" ? { label: "Payment Application", icon: "file-plus",  on: () => onManagePayApps(proc) } : null;
           return (
-            <div key={stage.key} style={{ display: "flex", gap: 12, paddingBottom: i < 11 ? 14 : 0, position: "relative" }}>
+            <div key={stage.key} style={{ display: "flex", gap: 12, paddingBottom: i < PROC_STAGES.length - 1 ? 14 : 0, position: "relative" }}>
               {/* Connector line */}
-              {i < 11 && <div style={{ position: "absolute", left: 13, top: 26, bottom: 0, width: 2,
+              {i < PROC_STAGES.length - 1 && <div style={{ position: "absolute", left: 13, top: 26, bottom: 0, width: 2,
                 background: done ? "#1F8A52" : "var(--ink-100)" }} />}
               {/* Dot */}
               <div style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, zIndex: 1,
@@ -2136,6 +2591,18 @@ function ProcDetailPane({ proc, onClose, onEdit, onDelete, onAdvance, onSetStage
                   </div>
                 )}
 
+                {/* Attached Proforma Invoice document */}
+                {stage.key === "proforma" && proc.proformaFile && proc.proformaFile.filePath && (
+                  <a href={((window.API || "").replace(/\/api$/, "")) + proc.proformaFile.filePath} target="_blank" rel="noreferrer"
+                    title={proc.proformaFile.fileName}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 6, padding: "4px 9px", borderRadius: 7,
+                      border: "1px solid #D6F0E0", background: "#F0FAF4", fontSize: 11, fontWeight: 600, color: "#1F8A52",
+                      textDecoration: "none", maxWidth: "100%", overflow: "hidden" }}>
+                    <Icon name="paperclip" size={11} color="#1F8A52" />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{proc.proformaFile.fileName}</span>
+                  </a>
+                )}
+
                 {/* Stage actions — tool opens from any stage; advance only on the active stage */}
                 {(current || toolBtn) && (
                   <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
@@ -2147,7 +2614,7 @@ function ProcDetailPane({ proc, onClose, onEdit, onDelete, onAdvance, onSetStage
                     {current && (
                       <button onClick={() => onAdvance(proc)} className="btn btn-primary btn-sm">
                         <Icon name="check" size={12} stroke={2.4} />
-                        {i === 11 ? "Complete procurement" : "Sign off & advance"}
+                        {i === STAGE_KEYS.length - 1 ? "Complete procurement" : "Sign off & advance"}
                       </button>
                     )}
                   </div>
@@ -2313,6 +2780,11 @@ function ProcurementPage() {
     setSelected(id);   // return to the lifecycle with this request open
   }, []);
 
+  // Vendor quote file attached/removed — refresh that request in place (stay on the page).
+  const handleQuoteFileUpdate = useCallbackPR((doc) => {
+    setItems(prev => prev.map(p => p.procId === doc.procId ? doc : p));
+  }, []);
+
   const handleSavePOs = useCallbackPR(async (id, purchaseOrders) => {
     const poAmount = purchaseOrders.reduce((s, p) => s + (p.total || 0), 0);
     try {
@@ -2370,6 +2842,7 @@ function ProcurementPage() {
       proc={items.find(p => p.procId === quotesItem.procId) || quotesItem}
       onBack={() => { const id = quotesItem.procId; setQuotesItem(null); setSelected(id); }}
       onSave={(payload) => handleSaveQuotes(quotesItem.procId, payload)}
+      onUploaded={handleQuoteFileUpdate}
       onManageItems={(p) => { setQuotesItem(null); setItemsItem(p); }}
     />
   );
@@ -2464,7 +2937,7 @@ function ProcurementPage() {
             <tbody>
               {filtered.map(p => {
                 const cur = STAGE_BY_KEY[p.currentStage] || PROC_STAGES[0];
-                const idx = stageIndex(p.currentStage);
+                const idx = procStageIndex(p.currentStage);
                 const st  = STATUS_META[p.status] || STATUS_META.in_progress;
                 const pr  = PRIORITY_META[p.priority] || PRIORITY_META.normal;
                 const isSel = selected === p.procId;
@@ -2555,7 +3028,7 @@ function ProcurementPage() {
 
       {showForm && <ProcurementFormModal onClose={() => setShowForm(false)} onSave={handleCreate} />}
       {editItem && <ProcurementFormModal initial={editItem} onClose={() => setEditItem(null)} onSave={handleUpdate} />}
-      {advItem  && <AdvanceModal proc={advItem} onClose={() => setAdvItem(null)} onConfirm={handleAdvance} />}
+      {advItem  && <AdvanceModal proc={items.find(p => p.procId === advItem.procId) || advItem} onClose={() => setAdvItem(null)} onConfirm={handleAdvance} onUploaded={handleQuoteFileUpdate} />}
     </div>
   );
 }
