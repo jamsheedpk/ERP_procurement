@@ -27,6 +27,7 @@ const DayBook            = require("../models/DayBook");
 const ReviewCycle        = require("../models/ReviewCycle");
 const Appraisal          = require("../models/Appraisal");
 const OrgGoal            = require("../models/OrgGoal");
+const SalaryStructure    = require("../models/SalaryStructure");
 
 const defaultUsers = [
   // ── Admin accounts ─────────────────────────────────────────────────────────
@@ -829,6 +830,7 @@ async function seed() {
     ReviewCycle.deleteMany({}),
     Appraisal.deleteMany({}),
     OrgGoal.deleteMany({}),
+    SalaryStructure.deleteMany({}),
   ]);
 
   console.log("🌱 Seeding...");
@@ -849,6 +851,27 @@ async function seed() {
 
   await PayrollRun.create(payrollRun);
   console.log(`   ✓ 1 payroll run (May 2026)`);
+
+  // Per-employee salary structures, derived from the May 2026 payroll lines so
+  // the Salary module reconciles with Payroll out of the box.
+  const gradeByEmp = Object.fromEntries(employees.map(e => [e.empId, e.grade || ""]));
+  const salaryStructures = payrollRun.lines.map(l => {
+    const housing   = Math.round(l.allowances * 0.6);
+    const transport = Math.round(l.allowances * 0.25);
+    const insurance = Math.round(l.deductions * 0.5);
+    return {
+      empId: l.empId, empName: l.emp, dept: l.dept, grade: gradeByEmp[l.empId] || "",
+      base: l.base,
+      allowances: { housing, transport, food: l.allowances - housing - transport, communication: 0, other: 0 },
+      overtime: l.overtime > 0
+        ? { method: "hourly_1_5", hoursPerMonth: 10, rateMultiplier: 1.5 }
+        : { method: "none" },
+      deductions: { loan: 0, advance: 0, insurance, other: l.deductions - insurance },
+      effectiveDate: "2026-01-01",
+    };
+  });
+  await SalaryStructure.insertMany(salaryStructures);
+  console.log(`   ✓ ${salaryStructures.length} salary structures`);
 
   await Renewal.insertMany(renewals);
   console.log(`   ✓ ${renewals.length} renewals`);
