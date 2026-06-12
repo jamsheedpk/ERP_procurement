@@ -8,7 +8,7 @@ import React from "react";
 import * as Lucide from "lucide-react";
 
 const toPascal = (name) =>
-  String(name || "").replace(/(^|-)([a-z])/g, (_, __, c) => c.toUpperCase());
+  String(name || "").replace(/(^|-)([a-z0-9])/g, (_, __, c) => c.toUpperCase());
 
 /** Lucide icon by kebab-case name, matching the monolith's <Icon name="..."/> API. */
 export function Icon({ name, size = 16, color = "currentColor", stroke = 2, style }) {
@@ -79,3 +79,5 @@ export function ErrorState({ title = "Something went wrong", message, onRetry })
 /** AED currency formatter shared across finance/procurement modules. */
 export const AED = (n) => "AED " + (Number(n) || 0).toLocaleString();
 export const VAT_RATE = 0.05;
+
+export { downloadElementAsPdf } from "./pdf.js";

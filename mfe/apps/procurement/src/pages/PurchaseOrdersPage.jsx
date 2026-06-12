@@ -2,6 +2,7 @@ import React from "react";
 import { Icon, Button } from "../legacy.jsx";
 import "../setup.js";
 import ProcurementPageDefault, { ItemsPage, QuotesPage, POPage, itemsTotals, AED, STAGE_BY_KEY } from "./ProcurementPage.jsx";
+import ProcFullView from "./ProcFullView.jsx";
 const { useState: useStatePO, useEffect: useEffectPO, useMemo: useMemoPO } = React;
 
 /**
@@ -16,6 +17,7 @@ export default function PurchaseOrdersPage() {
   const [poFor, setPoFor]           = useStatePO(null); // procId open in the PO editor
   const [comparingFor, setComparingFor] = useStatePO(null); // procId open in quote comparison
   const [itemsFor, setItemsFor]     = useStatePO(null); // procId open in the BOQ editor
+  const [fullViewFor, setFullViewFor] = useStatePO(null); // procId open in full view
   const [q, setQ] = useStatePO("");
 
   const load = () => fetch(`${window.API}/procurement`)
@@ -71,6 +73,12 @@ export default function PurchaseOrdersPage() {
       <div style={{ width: 32, height: 32, border: "3px solid var(--plum-100)", borderTopColor: "var(--brand-burgundy)", borderRadius: "50%", animation: "spin .8s linear infinite" }} />
     </div>
   );
+
+  // Full view — the whole request as one printable document.
+  if (fullViewFor) {
+    const proc = procs.find((p) => p.procId === fullViewFor);
+    if (proc) return <ProcFullView proc={proc} backLabel="Purchase Orders" onBack={() => setFullViewFor(null)} />;
+  }
 
   // BOQ drill-in (deepest level — reached from an empty comparison).
   if (itemsFor) {
@@ -194,17 +202,23 @@ export default function PurchaseOrdersPage() {
                       : <span style={{ color: "var(--fg-4)", fontSize: 12 }}>Needs BOQ list</span>}
                   </td>
                   <td style={{ textAlign: "right" }}>
-                    {ready ? (
-                      <Button variant={pos.length ? "secondary" : "primary"} size="sm" icon="file-output"
-                        onClick={(e) => { e.stopPropagation(); setPoFor(p.procId); }}>
-                        {pos.length ? "Manage" : "Issue"}
-                      </Button>
-                    ) : (
-                      <Button variant="ghost" size="sm" icon={itemCount ? "scale" : "list-checks"}
-                        onClick={(e) => { e.stopPropagation(); itemCount ? setComparingFor(p.procId) : setItemsFor(p.procId); }}>
-                        {itemCount ? "Compare" : "Add items"}
-                      </Button>
-                    )}
+                    <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                      <button className="icon-btn" title="Full view — entire request as one document"
+                        onClick={(e) => { e.stopPropagation(); setFullViewFor(p.procId); }}>
+                        <Icon name="maximize-2" size={15} />
+                      </button>
+                      {ready ? (
+                        <Button variant={pos.length ? "secondary" : "primary"} size="sm" icon="file-output"
+                          onClick={(e) => { e.stopPropagation(); setPoFor(p.procId); }}>
+                          {pos.length ? "Manage" : "Issue"}
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="sm" icon={itemCount ? "scale" : "list-checks"}
+                          onClick={(e) => { e.stopPropagation(); itemCount ? setComparingFor(p.procId) : setItemsFor(p.procId); }}>
+                          {itemCount ? "Compare" : "Add items"}
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

@@ -1,5 +1,6 @@
 import React from "react";
 import { Icon, Button, IconButton, Avatar, PartyAutocomplete, ProjectSelect } from "../legacy.jsx";
+import { downloadElementAsPdf } from "@meridian/ui";
 import "../setup.js";
 const {
   useState:    useStatePR,
@@ -44,6 +45,8 @@ var PR_SOURCE_META = {
 function TxnBreakdown(props) {
   var row     = props.row;
   var onClose = props.onClose;
+  var onFullView = props.onFullView;
+  var full    = props.full; // full-page rendering (no sticky sidebar sizing)
 
   var dataArr = useStatePR(null);
   var data    = dataArr[0];
@@ -63,8 +66,8 @@ function TxnBreakdown(props) {
   var txns = (data && data.transactions) || [];
 
   return (
-    <div className="card" style={{ position: "sticky", top: 90, padding: "18px 20px",
-      maxHeight: "calc(100vh - 110px)", overflowY: "auto", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+    <div className="card" style={{ position: full ? "static" : "sticky", top: 90, padding: full ? "26px 30px" : "18px 20px",
+      maxHeight: full ? "none" : "calc(100vh - 110px)", overflowY: "auto", scrollbarWidth: "none", msOverflowStyle: "none" }}>
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between",
@@ -73,7 +76,10 @@ function TxnBreakdown(props) {
           <div style={{ fontSize: 14, fontWeight: 700, color: "var(--fg-1)", lineHeight: 1.3 }}>{row.title}</div>
           <div style={{ fontSize: 11.5, color: "var(--fg-3)", marginTop: 3 }}>{row.partyName || "—"}</div>
         </div>
-        <IconButton icon="x" title="Close" onClick={onClose} />
+        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+          {onFullView && <IconButton icon="maximize-2" title="Full view — open the breakdown full page" onClick={onFullView} />}
+          {!full && <IconButton icon="x" title="Close" onClick={onClose} />}
+        </div>
       </div>
 
       {/* Net P&L headline */}
@@ -175,6 +181,7 @@ function ProjectReportPage() {
   var selectedArr = useStatePR(null); var selected = selectedArr[0]; var setSelected = selectedArr[1];
   var searchArr = useStatePR("");  var search = searchArr[0];   var setSearch = searchArr[1];
   var filterArr = useStatePR("all"); var resultFilter = filterArr[0]; var setResultFilter = filterArr[1];
+  var fullViewArr = useStatePR(false); var fullView = fullViewArr[0]; var setFullView = fullViewArr[1];
 
   useEffectPR(function() {
     setLoading(true);
@@ -249,6 +256,39 @@ function ProjectReportPage() {
 
   var profitCount = rows.filter(function(r) { return r.netProfit >= 0 && (r.totalIncome !== 0 || r.totalCost !== 0); }).length;
   var lossCount   = rows.filter(function(r) { return r.netProfit < 0; }).length;
+
+  // Full view — the selected project's P&L breakdown as one full page.
+  if (fullView && selRow) {
+    return (
+      <div className="page" style={{ maxWidth: 1000 }}>
+        <div className="page-head">
+          <div>
+            <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button onClick={function() { setFullView(false); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+                color: "var(--brand-burgundy)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600 }}>
+                <Icon name="arrow-left" size={13} /> Project P&amp;L Report
+              </button>
+              <span style={{ color: "var(--fg-4)" }}>/</span>
+              <span>Full view</span>
+            </div>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="file-bar-chart" size={20} /> {selRow.title}
+            </h1>
+            <div className="page-sub">{selRow.partyName || "—"}</div>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <Button variant="secondary" icon="download"
+              onClick={function() { downloadElementAsPdf(document.getElementById("fullview-doc"), (selRow.projectId || "project") + "-pnl-full-view.pdf"); }}>PDF</Button>
+            <Button variant="secondary" icon="printer" onClick={function() { window.print(); }}>Print</Button>
+            <Button variant="ghost" icon="arrow-left" onClick={function() { setFullView(false); }}>Back</Button>
+          </div>
+        </div>
+        <div id="fullview-doc">
+          <TxnBreakdown full row={selRow} onClose={function() { setFullView(false); }} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -428,7 +468,8 @@ function ProjectReportPage() {
 
         {/* Detail drawer */}
         {selRow && (
-          <TxnBreakdown row={selRow} onClose={function() { setSelected(null); }} />
+          <TxnBreakdown row={selRow} onClose={function() { setSelected(null); }}
+            onFullView={function() { setFullView(true); }} />
         )}
       </div>
     </div>

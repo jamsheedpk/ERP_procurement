@@ -1,5 +1,6 @@
 import React from "react";
 import { Icon, Button, IconButton, Avatar, PartyAutocomplete, ProjectSelect } from "../legacy.jsx";
+import { downloadElementAsPdf } from "@meridian/ui";
 import "../setup.js";
 const {
   useState:   useStateQ,
@@ -958,8 +959,14 @@ function QuotationPreview(props) {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#fff", borderLeft: "1px solid var(--border-subtle)" }}>
       {/* Preview toolbar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-surface)" }}>
-        <div style={{ fontWeight: 600, fontSize: 13, color: "var(--fg-1)" }}>Preview — {q.quotationId || ""}</div>
+        <div style={{ fontWeight: 600, fontSize: 13, color: "var(--fg-1)" }}>{props.full ? "Full view" : "Preview"} — {q.quotationId || ""}</div>
         <div style={{ display: "flex", gap: 6 }}>
+          {props.onFullView && (
+            <button className="btn" type="button" onClick={props.onFullView} title="Full view — open the document full page"
+              style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+              <Icon name="maximize-2" size={13} /> Full view
+            </button>
+          )}
           <button className="btn" type="button" onClick={onPrint} style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
             <Icon name="printer" size={13} /> Print
           </button>
@@ -1210,6 +1217,7 @@ function QuotationPage(props) {
   var stateEditQuo      = useStateQ(null); var editQuo = stateEditQuo[0];         var setEditQuo = stateEditQuo[1];
   var stateSearch       = useStateQ("");   var search = stateSearch[0];           var setSearch = stateSearch[1];
   var stateStatusFilter = useStateQ("all");var statusFilter = stateStatusFilter[0]; var setStatusFilter = stateStatusFilter[1];
+  var stateFullView     = useStateQ(false);var fullView = stateFullView[0];       var setFullView = stateFullView[1];
 
   useEffectQ(function() {
     fetchQuotations();
@@ -1344,6 +1352,40 @@ function QuotationPage(props) {
     { value: "rejected", label: "Rejected" },
     { value: "expired",  label: "Expired" },
   ];
+
+  // Full view — the selected quotation document on its own page.
+  if (fullView && selected) {
+    return (
+      <div className="page" style={{ maxWidth: 1000 }}>
+        <div className="page-head">
+          <div>
+            <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button onClick={function() { setFullView(false); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+                color: "var(--brand-burgundy)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600 }}>
+                <Icon name="arrow-left" size={13} /> Quotations
+              </button>
+              <span style={{ color: "var(--fg-4)" }}>/</span>
+              <span>Full view</span>
+            </div>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="file-text" size={20} /> {selected.quotationId}
+            </h1>
+            <p className="page-sub">{selected.projectTitle || selected.projectName || ""} · {selected.clientName || selected.partyName || ""}</p>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <Button variant="secondary" icon="download"
+              onClick={function() { downloadElementAsPdf(document.getElementById("quo-print-area"), selected.quotationId + "-full-view.pdf"); }}>PDF</Button>
+            <Button variant="secondary" icon="printer" onClick={handlePrint}>Print</Button>
+            <Button variant="ghost" icon="arrow-left" onClick={function() { setFullView(false); }}>Back</Button>
+          </div>
+        </div>
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+          <QuotationPreview quotation={selected} onPrint={handlePrint} full
+            onClose={function() { setFullView(false); }} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page" style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -1533,6 +1575,7 @@ function QuotationPage(props) {
               quotation={selected}
               onClose={function() { setSelected(null); }}
               onPrint={handlePrint}
+              onFullView={function() { setFullView(true); }}
             />
           </div>
         )}

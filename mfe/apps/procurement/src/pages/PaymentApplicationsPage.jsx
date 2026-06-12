@@ -2,6 +2,7 @@ import React from "react";
 import { Icon, Button } from "../legacy.jsx";
 import "../setup.js";
 import ProcurementPageDefault, { ItemsPage, QuotesPage, POPage, PaymentAppPage, AED, STAGE_BY_KEY } from "./ProcurementPage.jsx";
+import ProcFullView from "./ProcFullView.jsx";
 const { useState: useStatePA, useEffect: useEffectPA, useMemo: useMemoPA } = React;
 
 /**
@@ -17,6 +18,7 @@ export default function PaymentApplicationsPage() {
   const [poFor, setPoFor]           = useStatePA(null); // procId open in the LPO editor
   const [comparingFor, setComparingFor] = useStatePA(null);
   const [itemsFor, setItemsFor]     = useStatePA(null);
+  const [fullViewFor, setFullViewFor] = useStatePA(null); // procId open in full view
   const [q, setQ] = useStatePA("");
 
   const load = () => fetch(`${window.API}/procurement`)
@@ -70,6 +72,12 @@ export default function PaymentApplicationsPage() {
       <div style={{ width: 32, height: 32, border: "3px solid var(--plum-100)", borderTopColor: "var(--brand-burgundy)", borderRadius: "50%", animation: "spin .8s linear infinite" }} />
     </div>
   );
+
+  // Full view — the whole request as one printable document.
+  if (fullViewFor) {
+    const proc = procs.find((p) => p.procId === fullViewFor);
+    if (proc) return <ProcFullView proc={proc} backLabel="Payment Applications" onBack={() => setFullViewFor(null)} />;
+  }
 
   // ── Drill chain (deepest first). Each Back/save returns one level up. ──
   if (itemsFor) {
@@ -202,17 +210,23 @@ export default function PaymentApplicationsPage() {
                       : <span style={{ color: "var(--fg-4)", fontSize: 12 }}>Needs BOQ list</span>}
                   </td>
                   <td style={{ textAlign: "right" }}>
-                    {ready ? (
-                      <Button variant={apps.length ? "secondary" : "primary"} size="sm" icon="file-plus"
-                        onClick={(e) => { e.stopPropagation(); setPayFor(p.procId); }}>
-                        {apps.length ? "Manage" : "Apply"}
-                      </Button>
-                    ) : (
-                      <Button variant="ghost" size="sm" icon={itemCount ? "scale" : "list-checks"}
-                        onClick={(e) => { e.stopPropagation(); itemCount ? setComparingFor(p.procId) : setItemsFor(p.procId); }}>
-                        {itemCount ? "Compare" : "Add items"}
-                      </Button>
-                    )}
+                    <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                      <button className="icon-btn" title="Full view — entire request as one document"
+                        onClick={(e) => { e.stopPropagation(); setFullViewFor(p.procId); }}>
+                        <Icon name="maximize-2" size={15} />
+                      </button>
+                      {ready ? (
+                        <Button variant={apps.length ? "secondary" : "primary"} size="sm" icon="file-plus"
+                          onClick={(e) => { e.stopPropagation(); setPayFor(p.procId); }}>
+                          {apps.length ? "Manage" : "Apply"}
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="sm" icon={itemCount ? "scale" : "list-checks"}
+                          onClick={(e) => { e.stopPropagation(); itemCount ? setComparingFor(p.procId) : setItemsFor(p.procId); }}>
+                          {itemCount ? "Compare" : "Add items"}
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

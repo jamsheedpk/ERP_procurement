@@ -1,5 +1,6 @@
 import React from "react";
 import { Icon, Button, IconButton, Avatar, PartyAutocomplete, ProjectSelect } from "../legacy.jsx";
+import { downloadElementAsPdf } from "@meridian/ui";
 import "../setup.js";
 import { computeItemsLocally } from "../quoteTotals.js";
 // Invoices module — list, view/print, status, payments. Invoices are usually
@@ -159,6 +160,122 @@ function InvRecordPaymentModal(props) {
   );
 }
 
+// ── Full view — the invoice document rendered on-screen, full page ───────────────
+function InvFullDocument(props) {
+  var inv = props.invoice || {};
+  var items = inv.items || [];
+  var lblStyle = { fontSize: 10, color: "#888", fontWeight: 700, textTransform: "uppercase" };
+  var thStyle = { padding: "9px 10px", fontSize: 11, background: "var(--brand-burgundy)", color: "#fff", textAlign: "left" };
+  var thRight = { padding: "9px 10px", fontSize: 11, background: "var(--brand-burgundy)", color: "#fff", textAlign: "right" };
+
+  return (
+    <div style={{ padding: "24px 28px", fontSize: 13, color: "#1a1a1a", background: "#fff" }}>
+      {/* Company header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, paddingBottom: 18, borderBottom: "3px solid var(--brand-burgundy)" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--brand-burgundy)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 18 }}>M</div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "var(--brand-burgundy)" }}>Meridian Architecture & Development</div>
+              <div style={{ fontSize: 11, color: "#666" }}>Design · Engineering · Construction</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: "#555", lineHeight: 1.7 }}>
+            <div>Business Bay, Dubai, UAE</div>
+            <div>+971 4 000 0000 · info@meridianad.ae</div>
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "var(--brand-burgundy)", letterSpacing: -0.5 }}>TAX INVOICE</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#333", marginTop: 2 }}>{inv.invoiceId || ""}</div>
+          {inv.quotationId ? <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>Ref: {inv.quotationId}</div> : null}
+          <div style={{ marginTop: 8 }}><InvStatusBadge status={inv.status} /></div>
+        </div>
+      </div>
+
+      {/* Dates */}
+      <div style={{ display: "flex", gap: 24, marginBottom: 20, flexWrap: "wrap" }}>
+        <div><span style={lblStyle}>Invoice Date</span><br /><span style={{ fontWeight: 600 }}>{inv.date || "—"}</span></div>
+        <div><span style={lblStyle}>Due Date</span><br /><span style={{ fontWeight: 600 }}>{inv.dueDate || "—"}</span></div>
+        <div><span style={lblStyle}>Currency</span><br /><span style={{ fontWeight: 600 }}>{inv.currency || "AED"}</span></div>
+      </div>
+
+      {/* From / Bill To */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+        <div style={{ padding: "14px 16px", borderRadius: 8, background: "#fdf4f8" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--brand-burgundy)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>From</div>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>Meridian Architecture & Development</div>
+          <div style={{ fontSize: 11, color: "#666", marginTop: 4, lineHeight: 1.6 }}>Business Bay, Dubai, UAE</div>
+        </div>
+        <div style={{ padding: "14px 16px", borderRadius: 8, border: "1px solid #eee" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "var(--brand-burgundy)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Bill To</div>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>{inv.clientName || inv.partyName || "—"}</div>
+          <div style={{ fontSize: 11, color: "#666", marginTop: 4, lineHeight: 1.6 }}>
+            {inv.clientAddress ? <div>{inv.clientAddress}</div> : null}
+            {inv.clientPhone ? <div>T: {inv.clientPhone}</div> : null}
+            {inv.clientEmail ? <div>E: {inv.clientEmail}</div> : null}
+          </div>
+          {inv.projectTitle ? <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>Project: {inv.projectTitle}</div> : null}
+        </div>
+      </div>
+
+      {/* Line items */}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 18 }}>
+        <thead>
+          <tr>
+            <th style={thStyle}>#</th><th style={thStyle}>Description</th><th style={thStyle}>Unit</th>
+            <th style={thRight}>Qty</th><th style={thRight}>Rate</th><th style={thRight}>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map(function(it, i) {
+            return (
+              <tr key={i} style={{ background: i % 2 === 0 ? "#fff" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
+                <td style={{ padding: "7px 10px", color: "#888", fontSize: 12 }}>{i + 1}</td>
+                <td style={{ padding: "7px 10px", fontSize: 12 }}>
+                  {it.category ? <span style={{ fontSize: 10, color: "var(--brand-burgundy)", fontWeight: 700, marginRight: 6 }}>{it.category}</span> : null}
+                  {it.description || ""}
+                </td>
+                <td style={{ padding: "7px 10px", color: "#666", fontSize: 12 }}>{it.unit || "lump sum"}</td>
+                <td style={{ padding: "7px 10px", textAlign: "right", fontSize: 12 }}>{it.qty || 0}</td>
+                <td style={{ padding: "7px 10px", textAlign: "right", fontSize: 12 }}>{invAED(it.unitPrice)}</td>
+                <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 600, fontSize: 12 }}>{invAED((parseFloat(it.qty) || 0) * (parseFloat(it.unitPrice) || 0))}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* Totals */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
+        <div style={{ width: 300 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 10px", fontSize: 12 }}><span style={{ color: "#555" }}>Subtotal</span><span>{invAED(inv.subtotal)}</span></div>
+          {inv.discountAmt > 0 ? (
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 10px", fontSize: 12 }}><span style={{ color: "#555" }}>Discount ({inv.discountPct || 0}%)</span><span style={{ color: "#C0263A" }}>- {invAED(inv.discountAmt)}</span></div>
+          ) : null}
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 10px", fontSize: 12 }}><span style={{ color: "#555" }}>VAT ({inv.taxPct || 0}%)</span><span>{invAED(inv.taxAmt)}</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: 10, borderRadius: 6, marginTop: 6, fontWeight: 800, fontSize: 14, background: "var(--brand-burgundy)", color: "#fff" }}><span>Grand Total</span><span>{invAED(inv.grandTotal)}</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 10px", fontSize: 12, marginTop: 6 }}><span style={{ color: "#1F8A52" }}>Amount Paid</span><span style={{ color: "#1F8A52" }}>{invAED(inv.amountPaid)}</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 10px", fontSize: 13, fontWeight: 700 }}><span>Balance Due</span><span style={{ color: "#C0263A" }}>{invAED(inv.balanceDue)}</span></div>
+        </div>
+      </div>
+
+      {inv.paymentTerms ? (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--brand-burgundy)", marginBottom: 6, borderBottom: "1px solid #eee", paddingBottom: 4 }}>Payment Terms</div>
+          <div style={{ lineHeight: 1.8, color: "#555", fontSize: 12 }}>{inv.paymentTerms}</div>
+        </div>
+      ) : null}
+      {inv.notes ? (
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--brand-burgundy)", marginBottom: 6, borderBottom: "1px solid #eee", paddingBottom: 4 }}>Notes</div>
+          <div style={{ lineHeight: 1.8, color: "#555", fontSize: 12 }}>{inv.notes}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────────
 function InvoicePage(props) {
   var API = window.API || "http://localhost:5000/api";
@@ -168,6 +285,7 @@ function InvoicePage(props) {
   var stSearch = React.useState("");    var search = stSearch[0],    setSearch = stSearch[1];
   var stFilter = React.useState("all"); var statusFilter = stFilter[0], setStatusFilter = stFilter[1];
   var stPay = React.useState(null);     var payFor = stPay[0],       setPayFor = stPay[1];
+  var stFull = React.useState(false);   var fullView = stFull[0],    setFullView = stFull[1];
 
   React.useEffect(function() { fetchInvoices(); }, []);
 
@@ -234,6 +352,39 @@ function InvoicePage(props) {
     { label: "Outstanding",    value: invAED(totalOutstanding),icon: "alert-circle", color: "#C0263A" },
     { label: "Invoices",       value: invoices.length,         icon: "receipt",      color: "#2563B0" },
   ];
+
+  // Full view — the selected invoice document on its own page.
+  if (fullView && selected) {
+    return (
+      <div className="page" style={{ maxWidth: 1000 }}>
+        <div className="page-head">
+          <div>
+            <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button onClick={function() { setFullView(false); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+                color: "var(--brand-burgundy)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600 }}>
+                <Icon name="arrow-left" size={13} /> Invoices
+              </button>
+              <span style={{ color: "var(--fg-4)" }}>/</span>
+              <span>Full view</span>
+            </div>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="receipt" size={20} /> {selected.invoiceId}
+            </h1>
+            <p className="page-sub">{selected.clientName || selected.partyName || "—"}{selected.projectTitle || selected.projectName ? " · " + (selected.projectTitle || selected.projectName) : ""}</p>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <Button variant="secondary" icon="download"
+              onClick={function() { downloadElementAsPdf(document.getElementById("fullview-doc"), selected.invoiceId + "-full-view.pdf"); }}>PDF</Button>
+            <Button variant="secondary" icon="printer" onClick={function() { printInvoice(selected); }}>Print</Button>
+            <Button variant="ghost" icon="arrow-left" onClick={function() { setFullView(false); }}>Back</Button>
+          </div>
+        </div>
+        <div className="card" id="fullview-doc" style={{ padding: 0, overflow: "hidden" }}>
+          <InvFullDocument invoice={selected} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -372,6 +523,7 @@ function InvoicePage(props) {
                 <div style={{ marginTop: 8 }}><InvStatusBadge status={selected.status} /></div>
               </div>
               <div style={{ display: "flex", gap: 4 }}>
+                <IconButton icon="maximize-2" title="Full view — open the invoice full page" onClick={function() { setFullView(true); }} />
                 <IconButton icon="wallet" title="Record payment" onClick={function() { setPayFor(selected); }} />
                 <IconButton icon="printer" title="Print" onClick={function() { printInvoice(selected); }} />
                 <IconButton icon="x" title="Close" onClick={function() { setSelected(null); }} />

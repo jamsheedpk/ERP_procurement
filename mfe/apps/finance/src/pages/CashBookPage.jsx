@@ -1,5 +1,6 @@
 import React from "react";
 import { Icon, Button, IconButton, Avatar, PartyAutocomplete, ProjectSelect } from "../legacy.jsx";
+import { downloadElementAsPdf } from "@meridian/ui";
 import "../setup.js";
 const {
   useState:    useStateCB,
@@ -227,6 +228,7 @@ function CashBookPage() {
 
   const [editingNote, setEditingNote] = useStateCB(false);
   const [noteDraft,   setNoteDraft]   = useStateCB("");
+  const [fullView,    setFullView]    = useStateCB(false);
 
   // ── Fetch ────────────────────────────────────────────────────────────────────
   useEffectCB(function() {
@@ -389,6 +391,79 @@ function CashBookPage() {
       </div>
     </div>
   );
+
+  // Full view — the selected entry as one full-page voucher.
+  if (fullView && selEntry) {
+    const isReceipt = selEntry.entryType === "receipt";
+    const cbCatMeta = getCatMeta(selEntry.entryType, selEntry.category);
+    const cbModeMeta = CB_MODES[selEntry.paymentMode] || CB_MODES.cash;
+    return (
+      <div className="page" style={{ maxWidth: 1000 }}>
+        <div className="page-head">
+          <div>
+            <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button onClick={function() { setFullView(false); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+                color: "var(--brand-burgundy)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600 }}>
+                <Icon name="arrow-left" size={13} /> Cash Book
+              </button>
+              <span style={{ color: "var(--fg-4)" }}>/</span>
+              <span>Full view</span>
+            </div>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name={isReceipt ? "arrow-down-left" : "arrow-up-right"} size={20} color={isReceipt ? "#1F8A52" : "#C0263A"} /> {selEntry.description}
+            </h1>
+            <div className="page-sub" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontFamily: "monospace" }}>{selEntry.entryId}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 5,
+                background: isReceipt ? "#ECFDF5" : "#FFF1F2", color: isReceipt ? "#1F8A52" : "#C0263A" }}>
+                {isReceipt ? "Receipt" : "Payment"}
+              </span>
+            </div>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <Button variant="secondary" icon="download"
+              onClick={function() { downloadElementAsPdf(document.getElementById("fullview-doc"), selEntry.entryId + "-full-view.pdf"); }}>PDF</Button>
+            <Button variant="secondary" icon="printer" onClick={function() { window.print(); }}>Print</Button>
+            <Button variant="ghost" icon="arrow-left" onClick={function() { setFullView(false); }}>Back</Button>
+          </div>
+        </div>
+
+        <div className="card" id="fullview-doc" style={{ padding: "26px 30px" }}>
+          <div style={{ fontSize: 30, fontWeight: 800, textAlign: "center", padding: "20px 0", borderRadius: 10, marginBottom: 22,
+            background: "var(--ink-50)", color: isReceipt ? "#1F8A52" : "#C0263A" }}>
+            {fmtAED(selEntry.amount)}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px 22px", marginBottom: 22 }}>
+            {[
+              { lbl: "Entry ID",     val: selEntry.entryId },
+              { lbl: "Date",         val: selEntry.date },
+              { lbl: "Category",     val: cbCatMeta.label },
+              { lbl: "Party",        val: selEntry.party || "—" },
+              { lbl: "Payment mode", val: cbModeMeta.label },
+              { lbl: "Reference",    val: selEntry.reference || "—" },
+              { lbl: "Source",       val: selEntry._source === "expense" ? "Expense claim" : "Cash book entry" },
+            ].map(function(m) {
+              return (
+                <div key={m.lbl}>
+                  <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".07em", color: "var(--fg-3)", fontWeight: 600 }}>{m.lbl}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)", marginTop: 3 }}>{m.val}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ borderTop: "2px solid var(--brand-burgundy)", paddingTop: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Notes</div>
+            <div style={{ fontSize: 12.5, color: selEntry.notes ? "var(--fg-2)" : "var(--fg-3)", lineHeight: 1.6,
+              fontStyle: selEntry.notes ? "normal" : "italic" }}>
+              {selEntry.notes || "No notes."}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -687,6 +762,7 @@ function CashBookPage() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                <IconButton icon="maximize-2" title="Full view — open the entry full page" onClick={function() { setFullView(true); }} />
                 {!selEntry._source && (
                   <IconButton icon="trash-2" title="Delete" onClick={function() { handleDelete(selEntry.entryId); }} />
                 )}

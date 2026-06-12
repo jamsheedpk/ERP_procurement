@@ -2,6 +2,7 @@ import React from "react";
 import { Icon, Button } from "../legacy.jsx";
 import "../setup.js";
 import ProcurementPageDefault, { ItemsPage, QuotesPage, itemsTotals, AED, STAGE_BY_KEY } from "./ProcurementPage.jsx";
+import ProcFullView from "./ProcFullView.jsx";
 const { useState: useStateVQ, useEffect: useEffectVQ, useMemo: useMemoVQ } = React;
 
 /**
@@ -14,6 +15,7 @@ export default function VendorQuotesPage() {
   const [error, setError]       = useStateVQ(null);
   const [comparing, setComparing] = useStateVQ(null); // procId open in the comparison editor
   const [editingItems, setEditingItems] = useStateVQ(null); // procId open in the BOQ editor (reached from empty comparisons)
+  const [fullViewFor, setFullViewFor] = useStateVQ(null); // procId open in full view
   const [q, setQ]               = useStateVQ("");
 
   const load = () => fetch(`${window.API}/procurement`)
@@ -88,6 +90,12 @@ export default function VendorQuotesPage() {
       <div style={{ width: 32, height: 32, border: "3px solid var(--plum-100)", borderTopColor: "var(--brand-burgundy)", borderRadius: "50%", animation: "spin .8s linear infinite" }} />
     </div>
   );
+
+  // Full view — the whole request as one printable document.
+  if (fullViewFor) {
+    const proc = procs.find((p) => p.procId === fullViewFor);
+    if (proc) return <ProcFullView proc={proc} backLabel="Quote Comparisons" onBack={() => setFullViewFor(null)} />;
+  }
 
   // BOQ drill-in (comparison needs items first).
   if (editingItems) {
@@ -181,17 +189,23 @@ export default function VendorQuotesPage() {
                       : <span style={{ color: "var(--fg-4)", fontSize: 12 }}>Needs BOQ list</span>}
                   </td>
                   <td style={{ textAlign: "right" }}>
-                    {itemCount ? (
-                      <Button variant={awards.length ? "secondary" : "primary"} size="sm" icon="scale"
-                        onClick={(e) => { e.stopPropagation(); setComparing(p.procId); }}>
-                        Compare
-                      </Button>
-                    ) : (
-                      <Button variant="ghost" size="sm" icon="list-checks"
-                        onClick={(e) => { e.stopPropagation(); setEditingItems(p.procId); }}>
-                        Add items
-                      </Button>
-                    )}
+                    <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                      <button className="icon-btn" title="Full view — entire request as one document"
+                        onClick={(e) => { e.stopPropagation(); setFullViewFor(p.procId); }}>
+                        <Icon name="maximize-2" size={15} />
+                      </button>
+                      {itemCount ? (
+                        <Button variant={awards.length ? "secondary" : "primary"} size="sm" icon="scale"
+                          onClick={(e) => { e.stopPropagation(); setComparing(p.procId); }}>
+                          Compare
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="sm" icon="list-checks"
+                          onClick={(e) => { e.stopPropagation(); setEditingItems(p.procId); }}>
+                          Add items
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

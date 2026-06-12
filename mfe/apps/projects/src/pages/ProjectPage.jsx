@@ -1,5 +1,6 @@
 import React from "react";
 import { Icon, Button, IconButton, Avatar, PartyAutocomplete, ProjectSelect } from "../legacy.jsx";
+import { downloadElementAsPdf } from "@meridian/ui";
 import "../setup.js";
 const {
   useState:    useStateProj,
@@ -1066,6 +1067,8 @@ function DetailPane(props) {
   var onAdvanceStage  = props.onAdvanceStage;
   var onActivate      = props.onActivate;
   var onNoteSave      = props.onNoteSave;
+  var onFullView      = props.onFullView;
+  var full            = props.full; // full-page rendering (no sticky sidebar sizing)
 
   var editStateArr = useStateProj(false);
   var editingNote  = editStateArr[0];
@@ -1209,8 +1212,9 @@ function DetailPane(props) {
   }
 
   return (
-    <div className="card" style={{ padding: "18px 20px", position: "sticky", top: 90,
-      maxHeight: "calc(100vh - 110px)", overflowY: "auto", scrollbarWidth: "none",
+    <div className="card" style={{ padding: full ? "26px 30px" : "18px 20px",
+      position: full ? "static" : "sticky", top: 90,
+      maxHeight: full ? "none" : "calc(100vh - 110px)", overflowY: "auto", scrollbarWidth: "none",
       msOverflowStyle: "none", minWidth: 0 }}>
 
       {/* Header */}
@@ -1234,9 +1238,10 @@ function DetailPane(props) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+          {onFullView && <IconButton icon="maximize-2" title="Full view — open the project full page" onClick={onFullView} />}
           <IconButton icon="edit-2" title="Edit project" onClick={function() { onEdit(project); }} />
           <IconButton icon="trash-2" title="Delete" onClick={function() { onDelete(project.projectId); }} />
-          <IconButton icon="x" title="Close" onClick={onClose} />
+          {!full && <IconButton icon="x" title="Close" onClick={onClose} />}
         </div>
       </div>
 
@@ -1491,6 +1496,10 @@ function ProjectPage() {
   var showDiscussion  = showDiscussionStateArr[0];
   var setShowDiscussion = showDiscussionStateArr[1];
 
+  var fullViewStateArr = useStateProj(false);
+  var fullView    = fullViewStateArr[0];
+  var setFullView = fullViewStateArr[1];
+
   var searchStateArr = useStateProj("");
   var search     = searchStateArr[0];
   var setSearch  = searchStateArr[1];
@@ -1722,6 +1731,54 @@ function ProjectPage() {
       display: "flex", alignItems: "center", justifyContent: "center", opacity: dis ? 0.4 : 1 };
   };
 
+  // Full view — the selected project's detail rendered as one full page.
+  // Edit / discussion / advance actions drop back to the pipeline first so
+  // their modals (rendered by the main view) can open.
+  if (fullView && selectedProject) {
+    var fvType = PROJ_TYPES[selectedProject.type] || PROJ_TYPES.other;
+    return (
+      <div className="page" style={{ maxWidth: 1000 }}>
+        <div className="page-head">
+          <div>
+            <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button onClick={function() { setFullView(false); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+                color: "var(--brand-burgundy)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600 }}>
+                <Icon name="arrow-left" size={13} /> Project Pipeline
+              </button>
+              <span style={{ color: "var(--fg-4)" }}>/</span>
+              <span>Full view</span>
+            </div>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name={fvType.icon} size={20} color={fvType.color} /> {selectedProject.title}
+            </h1>
+            <div className="page-sub">
+              {selectedProject.partyName || "—"}{selectedProject.location ? " · " + selectedProject.location : ""}
+            </div>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <Button variant="secondary" icon="download"
+              onClick={function() { downloadElementAsPdf(document.getElementById("fullview-doc"), (selectedProject.projectId || "project") + "-full-view.pdf"); }}>PDF</Button>
+            <Button variant="secondary" icon="printer" onClick={function() { window.print(); }}>Print</Button>
+            <Button variant="ghost" icon="arrow-left" onClick={function() { setFullView(false); }}>Back</Button>
+          </div>
+        </div>
+        <div id="fullview-doc">
+        <DetailPane
+          full
+          project={selectedProject}
+          onClose={function() { setFullView(false); }}
+          onEdit={function(proj) { setFullView(false); setShowEdit(proj); }}
+          onDelete={function(pid) { setFullView(false); handleDelete(pid); }}
+          onAddDiscussion={function(pid) { setFullView(false); setShowDiscussion(pid); }}
+          onAdvanceStage={function(proj) { setFullView(false); setShowAdvance(proj); }}
+          onActivate={handleActivate}
+          onNoteSave={handleNoteSave}
+        />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       {/* Page head */}
@@ -1932,6 +1989,7 @@ function ProjectPage() {
                 onAdvanceStage={function(proj) { setShowAdvance(proj); }}
                 onActivate={handleActivate}
                 onNoteSave={handleNoteSave}
+                onFullView={function() { setFullView(true); }}
               />
             </div>
           )}
@@ -2090,6 +2148,7 @@ function ProjectPage() {
               onAdvanceStage={function(proj) { setShowAdvance(proj); }}
               onActivate={handleActivate}
               onNoteSave={handleNoteSave}
+              onFullView={function() { setFullView(true); }}
             />
           )}
         </div>

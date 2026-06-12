@@ -1,5 +1,6 @@
 import React from "react";
 import { Icon, Button, IconButton, Avatar, PartyAutocomplete, ProjectSelect } from "../legacy.jsx";
+import { downloadElementAsPdf } from "@meridian/ui";
 import "../setup.js";
 const {
   useState:    useStatePY,
@@ -141,7 +142,7 @@ function PartyFormModal({ initial, onClose, onSave }) {
 }
 
 // ── PartyDetailPane ────────────────────────────────────────────────────────────
-function PartyDetailPane({ party, onEdit, onDelete, onClose, onStatusToggle }) {
+function PartyDetailPane({ party, onEdit, onDelete, onClose, onStatusToggle, onFullView }) {
   const pt = PARTY_TYPES[party.type] || PARTY_TYPES.other;
   const isActive = party.status === "active";
 
@@ -191,6 +192,7 @@ function PartyDetailPane({ party, onEdit, onDelete, onClose, onStatusToggle }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+          {onFullView && <IconButton icon="maximize-2" title="Full view — open the party full page" onClick={onFullView} />}
           <IconButton icon="edit-2" title="Edit" onClick={onEdit} />
           <IconButton icon="trash-2" title="Delete" onClick={() => onDelete(party.partyId)} />
           <IconButton icon="x" title="Close" onClick={onClose} />
@@ -272,6 +274,7 @@ function PartyPage() {
   const [typeFilter, setTypeFilter] = useStatePY("all");
   const [statusFilter, setStatusFilter] = useStatePY("all");
   const [page,       setPage]       = useStatePY(1);
+  const [fullView,   setFullView]   = useStatePY(false);
   const PAGE_SIZE = 15;
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
@@ -385,6 +388,77 @@ function PartyPage() {
       </div>
     </div>
   );
+
+  // Full view — the selected party as one full-page profile.
+  if (fullView && selParty) {
+    const pt = PARTY_TYPES[selParty.type] || PARTY_TYPES.other;
+    const isActive = selParty.status === "active";
+    const sections = [
+      { title: "Contact details", rows: [
+        ["Contact person", selParty.contactPerson], ["Phone", selParty.phone],
+        ["Email", selParty.email], ["Address", selParty.address]] },
+      { title: "Bank details", rows: [
+        ["Bank", selParty.bankName], ["Account", selParty.bankAccount], ["IBAN", selParty.bankIBAN]] },
+      { title: "Tax / legal", rows: [["Tax / CR no.", selParty.taxNumber]] },
+    ].map(s => ({ ...s, rows: s.rows.filter(r => r[1]) })).filter(s => s.rows.length);
+    return (
+      <div className="page" style={{ maxWidth: 1000 }}>
+        <div className="page-head">
+          <div>
+            <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button onClick={() => setFullView(false)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+                color: "var(--brand-burgundy)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600 }}>
+                <Icon name="arrow-left" size={13} /> Parties
+              </button>
+              <span style={{ color: "var(--fg-4)" }}>/</span>
+              <span>Full view</span>
+            </div>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name={pt.icon} size={20} color={pt.color} /> {selParty.name}
+            </h1>
+            <div className="page-sub" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontFamily: "monospace" }}>{selParty.partyId}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5,
+                background: pt.color + "15", color: pt.color }}>{pt.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 5,
+                background: isActive ? "#ECFDF5" : "var(--ink-100)", color: isActive ? "#1F8A52" : "var(--fg-3)" }}>
+                {isActive ? "Active" : "Inactive"}
+              </span>
+            </div>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <Button variant="secondary" icon="download"
+              onClick={() => downloadElementAsPdf(document.getElementById("fullview-doc"), selParty.partyId + "-full-view.pdf")}>PDF</Button>
+            <Button variant="secondary" icon="printer" onClick={() => window.print()}>Print</Button>
+            <Button variant="ghost" icon="arrow-left" onClick={() => setFullView(false)}>Back</Button>
+          </div>
+        </div>
+
+        <div className="card" id="fullview-doc" style={{ padding: "26px 30px" }}>
+          {sections.map(s => (
+            <div key={s.title} style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, borderBottom: "2px solid var(--brand-burgundy)", paddingBottom: 6, marginBottom: 12 }}>{s.title}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px 22px" }}>
+                {s.rows.map(([lbl, val]) => (
+                  <div key={lbl}>
+                    <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".07em", color: "var(--fg-3)", fontWeight: 600 }}>{lbl}</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)", marginTop: 3, wordBreak: "break-word" }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div style={{ marginBottom: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, borderBottom: "2px solid var(--brand-burgundy)", paddingBottom: 6, marginBottom: 12 }}>Notes</div>
+            <div style={{ fontSize: 12.5, color: selParty.notes ? "var(--fg-2)" : "var(--fg-3)", lineHeight: 1.6,
+              fontStyle: selParty.notes ? "normal" : "italic" }}>
+              {selParty.notes || "No notes."}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -653,6 +727,7 @@ function PartyPage() {
             onDelete={handleDelete}
             onClose={() => setSelected(null)}
             onStatusToggle={handleStatusToggle}
+            onFullView={() => setFullView(true)}
           />
         )}
       </div>

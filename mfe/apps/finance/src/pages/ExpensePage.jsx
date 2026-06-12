@@ -1,5 +1,6 @@
 import React from "react";
 import { Icon, Button, IconButton, Avatar, PartyAutocomplete, ProjectSelect } from "../legacy.jsx";
+import { downloadElementAsPdf } from "@meridian/ui";
 import "../setup.js";
 const {
   useState:    useStateEX,
@@ -365,6 +366,7 @@ function ExpensePage() {
 
   const [editingNote, setEditingNote] = useStateEX(false);
   const [noteDraft,   setNoteDraft]   = useStateEX("");
+  const [fullView,    setFullView]    = useStateEX(false);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   useEffectEX(() => {
@@ -574,6 +576,91 @@ function ExpensePage() {
       </div>
     </div>
   );
+
+  // Full view — the selected expense as one full-page voucher.
+  if (fullView && selExp) {
+    const catMeta = EX_CATS[selExp.cat] || EX_CATS.other;
+    const payMeta = PAYMENT_TYPES[selExp.paymentType] || PAYMENT_TYPES.cash;
+    const attachments = selExp.attachments || [];
+    return (
+      <div className="page" style={{ maxWidth: 1000 }}>
+        <div className="page-head">
+          <div>
+            <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button onClick={() => setFullView(false)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+                color: "var(--brand-burgundy)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600 }}>
+                <Icon name="arrow-left" size={13} /> Expenses
+              </button>
+              <span style={{ color: "var(--fg-4)" }}>/</span>
+              <span>Full view</span>
+            </div>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="receipt" size={20} /> {selExp.desc}
+            </h1>
+            <div className="page-sub" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontFamily: "monospace" }}>{selExp.expenseId}</span>
+              <StatusChip status={selExp.status} />
+            </div>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <Button variant="secondary" icon="download"
+              onClick={() => downloadElementAsPdf(document.getElementById("fullview-doc"), selExp.expenseId + "-full-view.pdf")}>PDF</Button>
+            <Button variant="secondary" icon="printer" onClick={() => window.print()}>Print</Button>
+            <Button variant="ghost" icon="arrow-left" onClick={() => setFullView(false)}>Back</Button>
+          </div>
+        </div>
+
+        <div className="card" id="fullview-doc" style={{ padding: "26px 30px" }}>
+          <div style={{ fontSize: 30, fontWeight: 800, textAlign: "center", padding: "20px 0",
+            background: "var(--ink-50)", borderRadius: 10, marginBottom: 22 }}>
+            {selExp.currency} {selExp.amount.toLocaleString()}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px 22px", marginBottom: 22 }}>
+            {[
+              { lbl: "Claimed by",   val: selExp.empName },
+              { lbl: "Department",   val: selExp.dept || "—" },
+              { lbl: "Category",     val: catMeta.label },
+              { lbl: "Date",         val: selExp.date },
+              { lbl: "Payment type", val: payMeta.label },
+              { lbl: "Party",        val: selExp.party || "—" },
+              { lbl: "Project",      val: selExp.projectName || "—" },
+              { lbl: "Status",       val: selExp.status },
+            ].map(m => (
+              <div key={m.lbl}>
+                <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: ".07em", color: "var(--fg-3)", fontWeight: 600 }}>{m.lbl}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--fg-1)", marginTop: 3 }}>{m.val}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ borderTop: "2px solid var(--brand-burgundy)", paddingTop: 14, marginBottom: 22 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Attachments · {attachments.length}</div>
+            {attachments.length ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {attachments.map((att, i) => (
+                  <a key={i} href={att.filePath} target="_blank" rel="noopener noreferrer"
+                    style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--brand-burgundy)", textDecoration: "none" }}>
+                    <Icon name="paperclip" size={14} />
+                    <span style={{ fontWeight: 600 }}>{att.fileName}</span>
+                    <span style={{ color: "var(--fg-4)", fontSize: 11.5 }}>{att.fileSizeMB} MB</span>
+                  </a>
+                ))}
+              </div>
+            ) : <div style={{ fontSize: 12.5, color: "var(--fg-3)" }}>No files attached.</div>}
+          </div>
+
+          <div style={{ borderTop: "2px solid var(--brand-burgundy)", paddingTop: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Notes</div>
+            <div style={{ fontSize: 12.5, color: selExp.notes ? "var(--fg-2)" : "var(--fg-3)", lineHeight: 1.6,
+              fontStyle: selExp.notes ? "normal" : "italic" }}>
+              {selExp.notes || "No notes."}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
@@ -825,6 +912,7 @@ function ExpensePage() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 4 }}>
+                <IconButton icon="maximize-2" title="Full view — open the expense full page" onClick={() => setFullView(true)} />
                 <IconButton icon="edit-2" title="Edit" onClick={() => setEditExp(selExp)} />
                 <IconButton icon="trash-2" title="Delete" onClick={() => handleDelete(selExp.expenseId)} />
                 <IconButton icon="x" title="Close" onClick={() => setSelected(null)} />

@@ -1,6 +1,7 @@
 import React from "react";
 import { Icon, Button, IconButton, Meter } from "../legacy.jsx";
 import "../setup.js";
+import ProcFullView from "./ProcFullView.jsx";
 const {
   useState:  useStatePR,
   useMemo:   useMemoPR,
@@ -2196,7 +2197,7 @@ function PaymentAppPage({ proc, onBack, onSave, onIssuePOs, backLabel = "Procure
 }
 
 // ── Detail pane with the vertical 11-step lifecycle ─────────────────────────────
-function ProcDetailPane({ proc, onClose, onEdit, onDelete, onAdvance, onSetStage, onManageItems, onCompareQuotes, onManagePOs, onManagePayApps, onSetStatus }) {
+function ProcDetailPane({ proc, onClose, onEdit, onDelete, onAdvance, onSetStage, onManageItems, onCompareQuotes, onManagePOs, onManagePayApps, onSetStatus, onFullView }) {
   const curIdx = procStageIndex(proc.currentStage);
   const st = STATUS_META[proc.status] || STATUS_META.in_progress;
 
@@ -2254,6 +2255,7 @@ function ProcDetailPane({ proc, onClose, onEdit, onDelete, onAdvance, onSetStage
           </div>
         </div>
         <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+          <IconButton icon="maximize-2" title="Full view — entire request as one document" onClick={() => onFullView(proc)} />
           <IconButton icon="edit-2" title="Edit" onClick={onEdit} />
           <IconButton icon="trash-2" title="Delete" onClick={() => onDelete(proc.procId)} />
           <IconButton icon="x" title="Close" onClick={onClose} />
@@ -2654,6 +2656,7 @@ function ProcurementPage() {
   const [quotesItem, setQuotesItem] = useStatePR(null);
   const [poItem, setPoItem] = useStatePR(null);
   const [payItem, setPayItem] = useStatePR(null);
+  const [fullViewItem, setFullViewItem] = useStatePR(null);
   const [search,  setSearch]  = useStatePR("");
   const [stageFilter,  setStageFilter]  = useStatePR("all");
   const [statusFilter, setStatusFilter] = useStatePR("all");
@@ -2869,6 +2872,14 @@ function ProcurementPage() {
     />
   );
 
+  // Full view — the whole request rendered as one printable document.
+  if (fullViewItem) return (
+    <ProcFullView
+      proc={items.find(p => p.procId === fullViewItem.procId) || fullViewItem}
+      onBack={() => { const id = fullViewItem.procId; setFullViewItem(null); setSelected(id); }}
+    />
+  );
+
   return (
     <div className="page">
       <div className="page-head">
@@ -3024,6 +3035,7 @@ function ProcurementPage() {
             onManagePOs={setPoItem}
             onManagePayApps={setPayItem}
             onSetStatus={handleSetStatus}
+            onFullView={setFullViewItem}
           />
         )}
       </div>
@@ -3038,6 +3050,6 @@ function ProcurementPage() {
 Object.assign(window, { ProcurementPage });
 
 // Reused by the standalone Material & Labour List module.
-export { ItemsPage, QuotesPage, POPage, PaymentAppPage, itemsTotals, itemsByCategory, AED, PROC_STAGES, STAGE_BY_KEY };
+export { ItemsPage, QuotesPage, POPage, PaymentAppPage, itemsTotals, itemsByCategory, AED, PROC_STAGES, STAGE_BY_KEY, STATUS_META };
 
 export default ProcurementPage;

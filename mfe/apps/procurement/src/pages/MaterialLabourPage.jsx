@@ -2,6 +2,7 @@ import React from "react";
 import { Icon, Button } from "../legacy.jsx";
 import "../setup.js";
 import ProcurementPageDefault, { ItemsPage, itemsTotals, itemsByCategory, AED, STAGE_BY_KEY } from "./ProcurementPage.jsx";
+import ProcFullView from "./ProcFullView.jsx";
 const { useState: useStateML, useEffect: useEffectML, useMemo: useMemoML } = React;
 
 /**
@@ -14,6 +15,7 @@ export default function MaterialLabourPage() {
   const [error, setError]     = useStateML(null);
   const [selected, setSelected] = useStateML(null); // procId shown in the detail pane
   const [editing, setEditing] = useStateML(null);   // procId open in the editor
+  const [fullViewFor, setFullViewFor] = useStateML(null); // procId open in full view
   const [q, setQ]             = useStateML("");
 
   const load = () => fetch(`${window.API}/procurement`)
@@ -71,6 +73,15 @@ export default function MaterialLabourPage() {
       <ItemsPage proc={proc} onBack={() => { setEditing(null); setSelected(editing); }}
         onSave={(list, applyTotal) => handleSave(editing, list, applyTotal)}
         backLabel="Material & Labour Lists" crumbLabel={proc.title || proc.procId} backButton="Back to lists" />
+    );
+  }
+
+  // Full view — the whole request as one printable document.
+  if (fullViewFor) {
+    const proc = procs.find((p) => p.procId === fullViewFor);
+    if (proc) return (
+      <ProcFullView proc={proc} backLabel="Material & Labour Lists"
+        onBack={() => { setFullViewFor(null); setSelected(fullViewFor); }} />
     );
   }
 
@@ -172,7 +183,10 @@ export default function MaterialLabourPage() {
                 <div className="card-title-lg">{sel.title || sel.procId}</div>
                 <div className="card-sub" style={{ fontFamily: "var(--font-mono)" }}>{sel.procId}</div>
               </div>
-              <button className="icon-btn" title="Close" onClick={() => setSelected(null)}><Icon name="x" size={16} /></button>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button className="icon-btn" title="Full view — entire request as one document" onClick={() => setFullViewFor(sel.procId)}><Icon name="maximize-2" size={16} /></button>
+                <button className="icon-btn" title="Close" onClick={() => setSelected(null)}><Icon name="x" size={16} /></button>
+              </div>
             </div>
             <div className="card-pad" style={{ paddingTop: 8 }}>
               {/* Meta */}
