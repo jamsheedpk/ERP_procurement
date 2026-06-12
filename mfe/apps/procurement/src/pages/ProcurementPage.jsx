@@ -505,7 +505,7 @@ function AdvanceModal({ proc, onClose, onConfirm, onUploaded }) {
 }
 
 // ── Material & Labour list builder — full-page view ─────────────────────────────
-function ItemsPage({ proc, onBack, onSave }) {
+function ItemsPage({ proc, onBack, onSave, backLabel = "Procurement Lifecycle", crumbLabel = "Step 2 · Prepare List", backButton = "Back to Lifecycle" }) {
   const [rows, setRows] = useStatePR(() =>
     (proc.items && proc.items.length) ? proc.items.map(r => ({ ...r })) : [{ ...BLANK_ITEM }]);
   const [saving, setSaving] = useStatePR(false);
@@ -606,10 +606,10 @@ function ItemsPage({ proc, onBack, onSave }) {
           <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <button onClick={onBack} style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
               color: "var(--brand-burgundy)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600 }}>
-              <Icon name="arrow-left" size={13} /> Procurement Lifecycle
+              <Icon name="arrow-left" size={13} /> {backLabel}
             </button>
             <span style={{ color: "var(--fg-4)" }}>/</span>
-            <span>Step 2 · Prepare List</span>
+            <span>{crumbLabel}</span>
           </div>
           <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Icon name="list-checks" size={20} /> Material &amp; Labour List
@@ -620,7 +620,7 @@ function ItemsPage({ proc, onBack, onSave }) {
         </div>
         <div className="row" style={{ gap: 8 }}>
           <Button variant="secondary" icon="download" onClick={downloadPdf}>Download PDF</Button>
-          <Button variant="ghost" icon="arrow-left" onClick={onBack}>Back to Lifecycle</Button>
+          <Button variant="ghost" icon="arrow-left" onClick={onBack}>{backButton}</Button>
         </div>
       </div>
 
@@ -761,7 +761,7 @@ function ItemsPage({ proc, onBack, onSave }) {
 // ── Vendor quote comparison — per-category vendor tables (step 4) ────────────────
 // Each work category (trade) has its OWN vendor columns (min 3), its own per-line
 // rates and its own award — like separate trade quotation sheets.
-function QuotesPage({ proc, onBack, onSave, onUploaded, onManageItems }) {
+function QuotesPage({ proc, onBack, onSave, onUploaded, onManageItems, backLabel = "Procurement Lifecycle", crumbLabel = "Step 4 · Comparison", backButton = "Back to Lifecycle" }) {
   const baseItems = proc.items || [];
 
   // Attached vendor quote docs, read live from the (refreshed) proc prop.
@@ -1015,10 +1015,10 @@ function QuotesPage({ proc, onBack, onSave, onUploaded, onManageItems }) {
         <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button onClick={onBack} style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
             color: "var(--brand-burgundy)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600 }}>
-            <Icon name="arrow-left" size={13} /> Procurement Lifecycle
+            <Icon name="arrow-left" size={13} /> {backLabel}
           </button>
           <span style={{ color: "var(--fg-4)" }}>/</span>
-          <span>Step 4 · Comparison</span>
+          <span>{crumbLabel}</span>
         </div>
         <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Icon name="scale" size={20} /> Vendor Quote Comparison
@@ -1032,7 +1032,7 @@ function QuotesPage({ proc, onBack, onSave, onUploaded, onManageItems }) {
           {groups.length} categor{groups.length === 1 ? "y" : "ies"}
         </div>
         <Button variant="secondary" icon="download" onClick={() => downloadPdf()}>Download PDF</Button>
-        <Button variant="ghost" icon="arrow-left" onClick={onBack}>Back to Lifecycle</Button>
+        <Button variant="ghost" icon="arrow-left" onClick={onBack}>{backButton}</Button>
       </div>
     </div>
   );
@@ -1316,7 +1316,7 @@ function QuotesPage({ proc, onBack, onSave, onUploaded, onManageItems }) {
 }
 
 // ── LPO Issue — one Purchase Order per awarded vendor (step 6) ──────────────────
-function POPage({ proc, onBack, onSave, onCompare }) {
+function POPage({ proc, onBack, onSave, onCompare, backLabel = "Procurement Lifecycle", crumbLabel = "Step 6 · LPO Issue", backButton = "Back to Lifecycle" }) {
   const pos = buildVendorPOs(proc);
   const existing = {};
   (proc.purchaseOrders || []).forEach(po => { existing[po.vendor] = po; });
@@ -1559,10 +1559,10 @@ function POPage({ proc, onBack, onSave, onCompare }) {
         <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button onClick={onBack} style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
             color: "var(--brand-burgundy)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600 }}>
-            <Icon name="arrow-left" size={13} /> Procurement Lifecycle
+            <Icon name="arrow-left" size={13} /> {backLabel}
           </button>
           <span style={{ color: "var(--fg-4)" }}>/</span>
-          <span>Step 6 · LPO Issue</span>
+          <span>{crumbLabel}</span>
         </div>
         <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Icon name="file-output" size={20} /> Local Purchase Orders
@@ -1577,7 +1577,7 @@ function POPage({ proc, onBack, onSave, onCompare }) {
             Download Summary{pos.length > 1 ? ` (${pos.length} LPOs)` : ""}
           </Button>
         )}
-        <Button variant="ghost" icon="arrow-left" onClick={onBack}>Back to Lifecycle</Button>
+        <Button variant="ghost" icon="arrow-left" onClick={onBack}>{backButton}</Button>
       </div>
     </div>
   );
@@ -1708,7 +1708,7 @@ function POPage({ proc, onBack, onSave, onCompare }) {
 }
 
 // ── Payment Application — progress / running bill per vendor (step 7) ───────────
-function PaymentAppPage({ proc, onBack, onSave, onIssuePOs }) {
+function PaymentAppPage({ proc, onBack, onSave, onIssuePOs, backLabel = "Procurement Lifecycle", crumbLabel = "Step 8 · Payment Application", backButton = "Back to Lifecycle" }) {
   const pos = buildVendorPOs(proc);
   const poByVendor = {};
   (proc.purchaseOrders || []).forEach(po => { poByVendor[po.vendor] = po; });
@@ -1941,10 +1941,10 @@ function PaymentAppPage({ proc, onBack, onSave, onIssuePOs }) {
         <div className="eyebrow" style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button onClick={onBack} style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
             color: "var(--brand-burgundy)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 600 }}>
-            <Icon name="arrow-left" size={13} /> Procurement Lifecycle
+            <Icon name="arrow-left" size={13} /> {backLabel}
           </button>
           <span style={{ color: "var(--fg-4)" }}>/</span>
-          <span>Step 8 · Payment Application</span>
+          <span>{crumbLabel}</span>
         </div>
         <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Icon name="file-plus" size={20} /> Application for Payment
@@ -1959,7 +1959,7 @@ function PaymentAppPage({ proc, onBack, onSave, onIssuePOs }) {
             Download Summary{pos.length > 1 ? ` (${pos.length} apps)` : ""}
           </Button>
         )}
-        <Button variant="ghost" icon="arrow-left" onClick={onBack}>Back to Lifecycle</Button>
+        <Button variant="ghost" icon="arrow-left" onClick={onBack}>{backButton}</Button>
       </div>
     </div>
   );
@@ -3036,5 +3036,8 @@ function ProcurementPage() {
 }
 
 Object.assign(window, { ProcurementPage });
+
+// Reused by the standalone Material & Labour List module.
+export { ItemsPage, QuotesPage, POPage, PaymentAppPage, itemsTotals, itemsByCategory, AED, PROC_STAGES, STAGE_BY_KEY };
 
 export default ProcurementPage;

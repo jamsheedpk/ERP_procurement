@@ -7,6 +7,7 @@ import CashBookPage from "./pages/CashBookPage.jsx";
 import DayBookPage from "./pages/DayBookPage.jsx";
 import PartyPage from "./pages/PartyPage.jsx";
 import QuotationPage from "./pages/QuotationPage.jsx";
+import InvoicePage from "./pages/InvoicePage.jsx";
 
 const PAGES = [
   { id: "expense",    label: "Expenses",   icon: "receipt" },
@@ -14,6 +15,7 @@ const PAGES = [
   { id: "daybook",    label: "Day Book",   icon: "notebook" },
   { id: "parties",    label: "Parties",    icon: "building-2" },
   { id: "quotations", label: "Quotations", icon: "file-text" },
+  { id: "invoices",   label: "Invoices",   icon: "file-check-2" },
 ];
 
 export default function App() {
@@ -23,9 +25,8 @@ export default function App() {
     case "cashbook":   page = <CashBookPage />; break;
     case "daybook":    page = <DayBookPage />; break;
     case "parties":    page = <PartyPage />; break;
-    // Quotation can create an invoice via the shared API; the Invoices screen
-    // lives in the Projects remote, so no in-module onNav target here.
     case "quotations": page = <QuotationPage />; break;
+    case "invoices":   page = <InvoicePage />; break;
     default:           page = <ExpensePage />;
   }
   return (

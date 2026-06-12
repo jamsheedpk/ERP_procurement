@@ -3,12 +3,10 @@ import "./legacy/hrm.css";
 import "./proj.css";
 import { Icon } from "./legacy.jsx";
 import ProjectPage from "./pages/ProjectPage.jsx";
-import InvoicePage from "./pages/InvoicePage.jsx";
 import ProjectReportPage from "./pages/ProjectReportPage.jsx";
 
 const PAGES = [
   { id: "pipeline",   label: "Pipeline",   icon: "folder-kanban" },
-  { id: "invoices",   label: "Invoices",   icon: "file-check-2" },
   { id: "projreport", label: "P&L Report", icon: "bar-chart-3" },
 ];
 
@@ -16,7 +14,6 @@ export default function App() {
   const [route, setRoute] = useState("pipeline");
   let page;
   switch (route) {
-    case "invoices":   page = <InvoicePage />; break;
     case "projreport": page = <ProjectReportPage />; break;
     default:           page = <ProjectPage />;
   }
