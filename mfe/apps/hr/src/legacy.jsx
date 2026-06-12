@@ -6,7 +6,7 @@
 import React from "react";
 import * as Lucide from "lucide-react";
 
-const toPascal = (name) => String(name || "").replace(/(^|-)([a-z])/g, (_, __, c) => c.toUpperCase());
+const toPascal = (name) => String(name || "").replace(/(^|-)([a-z0-9])/g, (_, __, c) => c.toUpperCase());
 
 export function Icon({ name, size = 18, stroke = 1.75, className = "", color }) {
   const Cmp = Lucide[toPascal(name)] || Lucide.Square;
