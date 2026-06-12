@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import "./legacy/hrm.css"; // monolith styling (pulls colors_and_type.css via @import)
 import "./hr.css";
 import { Icon, Button } from "./legacy.jsx";
+import { getToken, USER_KEY, TOKEN_KEY } from "@meridian/api";
 import { useHrData } from "./data.js";
 
 import PeoplePage, { EmployeeDrawer } from "./pages/PeoplePage.jsx";
@@ -17,6 +18,23 @@ import BenefitsPage from "./pages/BenefitsPage.jsx";
 import PerformancePage from "./pages/PerformancePage.jsx";
 import TrainingPage from "./pages/TrainingPage.jsx";
 import DocumentsPage from "./pages/DocumentsPage.jsx";
+import EmployeePortal from "./pages/EmployeePortal.jsx";
+
+// Employee self-service portal — reads the signed-in user the shell stored in
+// localStorage. Standalone (no session) it shows a sign-in notice instead of crashing.
+function PortalRoute() {
+  const token = getToken();
+  let authUser = null;
+  try { authUser = JSON.parse(localStorage.getItem(USER_KEY)); } catch { authUser = null; }
+  if (!authUser || !token) {
+    return <div className="hr-state"><Icon name="lock" size={28} /><div>Sign in from the shell to view your employee portal.</div></div>;
+  }
+  const onLogout = () => {
+    localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY);
+    window.location.reload();
+  };
+  return <EmployeePortal authUser={authUser} token={token} onLogout={onLogout} />;
+}
 
 const PAGES = [
   { id: "people",   label: "Employees",   icon: "users" },
@@ -32,9 +50,10 @@ const PAGES = [
   { id: "benefits", label: "Benefits",    icon: "gift" },
   { id: "perf",     label: "Performance", icon: "bar-chart-2" },
   { id: "learn",    label: "Training",    icon: "graduation-cap" },
+  { id: "portal",   label: "My Portal",   icon: "user-circle" },
 ];
 
-export default function App() {
+function AdminApp() {
   const [route, setRoute] = useState("people");
   const [openEmployee, setOpenEmployee] = useState(null);
   const { data, error, handleAdd, handleUpdate, handleLeaveStatus, upsertEmployee, removeEmployee } = useHrData();
@@ -57,6 +76,7 @@ export default function App() {
     case "benefits": page = <BenefitsPage data={data} />; break;
     case "perf":     page = <PerformancePage data={data} />; break;
     case "learn":    page = <TrainingPage data={data} />; break;
+    case "portal":   page = <PortalRoute />; break;
     default:         page = <PeoplePage data={data} onOpenEmployee={setOpenEmployee} onAdd={handleAdd} />;
   }
 
@@ -82,4 +102,15 @@ export default function App() {
       )}
     </div>
   );
+}
+
+// Employees never see the admin HR pages — just their own self-service portal.
+function EmployeeApp() {
+  return <div className="hr-shell"><div className="hr-content"><PortalRoute /></div></div>;
+}
+
+export default function App() {
+  let authUser = null;
+  try { authUser = JSON.parse(localStorage.getItem(USER_KEY)); } catch { authUser = null; }
+  return authUser?.userRole === "employee" ? <EmployeeApp /> : <AdminApp />;
 }

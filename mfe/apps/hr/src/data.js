@@ -7,7 +7,11 @@ const FMT_DATE = (d) => {
   const m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return d.getDate() + " " + m[d.getMonth()] + " " + d.getFullYear();
 };
-const j = (path) => fetch(`${API_BASE}${path}`).then((r) => r.json());
+const j = (path) => fetch(`${API_BASE}${path}`).then(async (r) => {
+  const body = await r.json().catch(() => null);
+  if (!r.ok) throw new Error((body && (body.error || body.message)) || `Request failed (${r.status})`);
+  return body;
+});
 
 /**
  * Builds the shared `DATA` object the HR pages expect (employees, departments,

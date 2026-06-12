@@ -1,14 +1,16 @@
 import React, { Suspense, useEffect, useState } from "react";
 import { HashRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { applyTheme } from "@meridian/theme";
+import { applyTheme, getSavedAccent } from "@meridian/theme";
 import { Spinner } from "@meridian/ui";
 import { api, getToken, USER_KEY, TOKEN_KEY } from "@meridian/api";
-import { Sidebar } from "./Sidebar.jsx";
+import { Sidebar, roleOf } from "./Sidebar.jsx";
+import { Topbar } from "./Topbar.jsx";
 import { Login } from "./Login.jsx";
 import { RemoteBoundary } from "./RemoteBoundary.jsx";
 
 // Federated remotes — each is an independently built & deployed micro-frontend.
 // React.lazy + the host's federation config resolve `remote/App` at runtime.
+const CoreApp        = React.lazy(() => import("core/App"));
 const ProcurementApp = React.lazy(() => import("procurement/App"));
 const HrApp          = React.lazy(() => import("hr/App"));
 const FinanceApp     = React.lazy(() => import("finance/App"));
@@ -23,19 +25,26 @@ function RemoteRoute({ name, children }) {
   );
 }
 
+// Admin workspace — full host chrome (sidebar + topbar) around the domain remotes.
+// Employees never reach this; they get the portal full-screen (see App below).
 function Layout({ user, onLogout }) {
   return (
     <div className="shell-root">
-      <Sidebar user={user} onLogout={onLogout} />
-      <main className="shell-main">
+      <Sidebar user={user} />
+      <div className="shell-main">
+        <Topbar user={user} onLogout={onLogout} />
+        <main className="shell-content">
         <Routes>
-          <Route path="/" element={<Navigate to="/procurement" replace />} />
+          <Route path="/" element={<Navigate to="/core" replace />} />
+          <Route path="/core/*"        element={<RemoteRoute name="Overview"><CoreApp /></RemoteRoute>} />
           <Route path="/procurement/*" element={<RemoteRoute name="Procurement"><ProcurementApp /></RemoteRoute>} />
           <Route path="/hr/*"          element={<RemoteRoute name="People & Culture"><HrApp /></RemoteRoute>} />
           <Route path="/finance/*"     element={<RemoteRoute name="Finance"><FinanceApp /></RemoteRoute>} />
           <Route path="/projects/*"    element={<RemoteRoute name="Projects"><ProjectsApp /></RemoteRoute>} />
+          <Route path="*" element={<Navigate to="/core" replace />} />
         </Routes>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
@@ -46,7 +55,7 @@ export function App() {
   });
   const [checked, setChecked] = useState(false);
 
-  useEffect(() => { applyTheme("#6F1947"); }, []);
+  useEffect(() => { applyTheme(getSavedAccent()); }, []);
 
   // Validate any stored token on boot.
   useEffect(() => {
@@ -62,6 +71,20 @@ export function App() {
 
   if (!checked) return <Spinner label="Starting…" />;
   if (!user) return <Login onLogin={setUser} />;
+
+  // Employees get their self-service portal full-screen. The portal ships its own
+  // sidebar/topbar/sign-out, so wrapping it in the host chrome would double everything.
+  if (roleOf(user) === "employee") {
+    return (
+      <div className="shell-employee">
+        <RemoteBoundary name="My Portal" routeKey="portal">
+          <Suspense fallback={<Spinner label="Loading your portal…" />}>
+            <HrApp />
+          </Suspense>
+        </RemoteBoundary>
+      </div>
+    );
+  }
 
   return (
     <HashRouter>

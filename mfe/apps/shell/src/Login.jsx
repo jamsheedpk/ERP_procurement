@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { api, TOKEN_KEY, USER_KEY } from "@meridian/api";
-import { Button } from "@meridian/ui";
+import { Button, Icon } from "@meridian/ui";
 
 export function Login({ onLogin }) {
   const [email, setEmail] = useState("admin@meridian.ae");
@@ -25,16 +25,17 @@ export function Login({ onLogin }) {
     <div className="login-wrap">
       <form className="login-card" onSubmit={submit}>
         <div className="login-mark">M</div>
-        <div className="login-title">Meridian ERP</div>
-        <div className="login-sub">Micro-frontend shell</div>
+        <div className="login-title">Welcome back</div>
+        <div className="login-sub">Sign in to the Meridian workspace</div>
         <label className="login-label">Email</label>
-        <input className="login-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input className="login-input" type="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@meridian.ae" />
         <label className="login-label">Password</label>
-        <input className="login-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        {err && <div className="login-err">{err}</div>}
-        <Button variant="primary" type="submit" disabled={busy} style={{ width: "100%", justifyContent: "center", marginTop: 8 }}>
+        <input className="login-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+        {err && <div className="login-err"><Icon name="alert-circle" size={13} /> {err}</div>}
+        <Button variant="primary" type="submit" disabled={busy} style={{ width: "100%", justifyContent: "center", marginTop: 14 }}>
           {busy ? "Signing in…" : "Sign in"}
         </Button>
+        <div className="login-hint">Demo · admin@meridian.ae / admin123</div>
       </form>
     </div>
   );

@@ -2,35 +2,46 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import { Icon } from "@meridian/ui";
 
-export const NAV = [
-  { to: "/procurement", label: "Procurement", icon: "git-merge", remote: true },
-  { to: "/hr",          label: "People & Culture", icon: "users", remote: true },
-  { to: "/finance",     label: "Finance", icon: "wallet", remote: true },
-  { to: "/projects",    label: "Projects", icon: "folder-kanban", remote: true },
+// Role-aware navigation. Admins get the full ERP; employees get only their
+// self-service portal (so they can't reach Finance, Procurement, or other
+// people's HR records).
+const ALL_NAV = [
+  { to: "/core",        label: "Overview",         icon: "layout-dashboard", roles: ["admin"] },
+  { to: "/procurement", label: "Procurement",      icon: "git-merge",        roles: ["admin"] },
+  { to: "/hr",          label: "People & Culture", icon: "users",            roles: ["admin"] },
+  { to: "/finance",     label: "Finance",          icon: "wallet",           roles: ["admin"] },
+  { to: "/projects",    label: "Projects",         icon: "folder-kanban",    roles: ["admin"] },
+  { to: "/hr",          label: "My Portal",        icon: "user-circle",      roles: ["employee"] },
 ];
 
-export function Sidebar({ user, onLogout }) {
+export const roleOf = (user) => (user?.userRole === "employee" ? "employee" : "admin");
+export const navFor = (user) => ALL_NAV.filter((n) => n.roles.includes(roleOf(user)));
+
+export function Sidebar({ user }) {
+  const nav = navFor(user);
   return (
     <aside className="shell-sidebar">
       <div className="shell-brand">
         <div className="shell-mark">M</div>
         <div>
           <div className="shell-brand-name">Meridian ERP</div>
-          <div className="shell-brand-sub">Micro-frontends</div>
+          <div className="shell-brand-sub">Logistics DMCC</div>
         </div>
       </div>
+
+      <div className="shell-nav-label">{roleOf(user) === "employee" ? "My space" : "Workspace"}</div>
       <nav className="shell-nav">
-        {NAV.map((n) => (
-          <NavLink key={n.to} to={n.to} className={({ isActive }) => "shell-nav-item" + (isActive ? " shell-nav-item--active" : "")}>
-            <Icon name={n.icon} size={16} />
+        {nav.map((n) => (
+          <NavLink key={n.label} to={n.to} className={({ isActive }) => "shell-nav-item" + (isActive ? " shell-nav-item--active" : "")}>
+            <span className="shell-nav-ico"><Icon name={n.icon} size={17} /></span>
             <span>{n.label}</span>
-            <span className="shell-nav-remote" title="Loaded as a federated remote">remote</span>
           </NavLink>
         ))}
       </nav>
+
       <div className="shell-foot">
-        {user && <div className="shell-user">{user.name || user.email}</div>}
-        <button className="shell-logout" onClick={onLogout}><Icon name="log-out" size={14} /> Sign out</button>
+        <div className="shell-foot-brand">Meridian Logistics DMCC</div>
+        <div className="shell-foot-ver">Enterprise · v0.1</div>
       </div>
     </aside>
   );

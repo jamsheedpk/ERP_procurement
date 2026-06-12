@@ -1,7 +1,8 @@
-import { API_BASE } from "@meridian/api";
+import { API_BASE, installAuthFetch } from "@meridian/api";
 
 if (typeof window !== "undefined") {
   window.API = API_BASE;
+  installAuthFetch();
 
   // ProjectPage uses Google Maps Places for its location picker. Load the script
   // once (matches the monolith index.html); the page already guards on

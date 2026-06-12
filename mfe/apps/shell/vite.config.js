@@ -14,6 +14,7 @@ export default defineConfig({
         hr:          "http://localhost:5102/assets/remoteEntry.js",
         finance:     "http://localhost:5103/assets/remoteEntry.js",
         projects:    "http://localhost:5104/assets/remoteEntry.js",
+        core:        "http://localhost:5105/assets/remoteEntry.js",
       },
       shared: ["react", "react-dom", "react-router-dom"],
     }),

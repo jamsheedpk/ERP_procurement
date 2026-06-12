@@ -1,9 +1,9 @@
 import React from "react";
 import { Icon, Button, IconButton, Avatar, PartyAutocomplete, ProjectSelect } from "../legacy.jsx";
 import "../setup.js";
-import { computeItemsLocally } from "./QuotationPage.jsx";
+import { computeItemsLocally } from "../quoteTotals.js";
 // Invoices module — list, view/print, status, payments. Invoices are usually
-// created by converting a Quotation (see QuotationPage "Invoice" action), but
+// created by converting a Quotation (now in the Finance remote's Quotations tab), but
 // can also be managed here. All identifiers are uniquely prefixed (INV_ / inv)
 // because every .jsx file shares one global scope.
 

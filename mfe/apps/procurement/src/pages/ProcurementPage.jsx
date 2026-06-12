@@ -1,6 +1,6 @@
 import React from "react";
-import { Icon, Button, IconButton, Meter } from "./legacy.jsx";
-import "./setup.js";
+import { Icon, Button, IconButton, Meter } from "../legacy.jsx";
+import "../setup.js";
 const {
   useState:  useStatePR,
   useMemo:   useMemoPR,

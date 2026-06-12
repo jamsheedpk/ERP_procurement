@@ -21,6 +21,9 @@ const Shift              = require("../models/Shift");
 const Course             = require("../models/Course");
 const Document           = require("../models/Document");
 const Expense            = require("../models/Expense");
+const Party              = require("../models/Party");
+const CashBook           = require("../models/CashBook");
+const DayBook            = require("../models/DayBook");
 const ReviewCycle        = require("../models/ReviewCycle");
 const Appraisal          = require("../models/Appraisal");
 const OrgGoal            = require("../models/OrgGoal");
@@ -477,6 +480,58 @@ const expenses = [
   { expenseId:"EXP-022", empId:"EMP-3801", empName:"Mei Ling Tan",       dept:"Technology",       avatar:{bg:"#E8F5EE",fg:"#136138"}, cat:"client",   amount:960,  currency:"AED", date:"2026-04-08", desc:"UX research participant incentives (4 × AED 240)",   status:"reimbursed", receipts:1, notes:"Research ops budget." },
 ];
 
+// ── Parties (counterparties for Cash Book / Day Book / Expenses) ──────────────
+const parties = [
+  { partyId:"PTY-001", name:"Gulf Office Supplies LLC",        type:"vendor",     contactPerson:"Rashid Noor",     phone:"+971 4 339 1122", email:"sales@gulfoffice.ae",     address:"Al Quoz Industrial 3, Dubai",   bankName:"Emirates NBD",     bankAccount:"1014772290", bankIBAN:"AE070331234567890123456", taxNumber:"100234567800003", status:"active",   notes:"Stationery & pantry supplier." },
+  { partyId:"PTY-002", name:"Emirates Fuel & Lube",            type:"vendor",     contactPerson:"Saeed Al Marri",  phone:"+971 4 885 7700", email:"fleet@emfuel.ae",         address:"Jebel Ali, Dubai",              bankName:"ADCB",             bankAccount:"2298110034", bankIBAN:"AE120350000002298110034", taxNumber:"100345678900003", status:"active",   notes:"Fleet fuel & lubricants account." },
+  { partyId:"PTY-003", name:"Al Quoz Facilities Mgmt",         type:"vendor",     contactPerson:"Maria Santos",    phone:"+971 4 340 9090", email:"accounts@aqfm.ae",        address:"Al Quoz 1, Dubai",              bankName:"Mashreq",          bankAccount:"0190557781", bankIBAN:"AE330200000190557781000", taxNumber:"100456789000003", status:"active",   notes:"Warehouse & office facilities/maintenance." },
+  { partyId:"PTY-004", name:"DEWA",                            type:"government", contactPerson:"",                phone:"+971 4 601 9999", email:"care@dewa.gov.ae",        address:"Al Wasl, Dubai",                bankName:"",                 bankAccount:"",           bankIBAN:"",                        taxNumber:"",                status:"active",   notes:"Electricity & water utility." },
+  { partyId:"PTY-005", name:"Etisalat",                        type:"vendor",     contactPerson:"",                phone:"800 101",         email:"business@etisalat.ae",    address:"Deira, Dubai",                  bankName:"",                 bankAccount:"",           bankIBAN:"",                        taxNumber:"100111222300003", status:"active",   notes:"Telecom & internet." },
+  { partyId:"PTY-006", name:"Jebel Ali Free Zone Authority",   type:"government", contactPerson:"",                phone:"+971 4 881 5555", email:"info@jafza.ae",           address:"Jebel Ali Free Zone, Dubai",    bankName:"",                 bankAccount:"",           bankIBAN:"",                        taxNumber:"",                status:"active",   notes:"Licence & lease authority." },
+  { partyId:"PTY-007", name:"Dubai Customs",                   type:"government", contactPerson:"",                phone:"+971 4 417 7777", email:"",                        address:"Al Mina, Dubai",                bankName:"",                 bankAccount:"",           bankIBAN:"",                        taxNumber:"",                status:"active",   notes:"Customs duties & clearance." },
+  { partyId:"PTY-008", name:"Saudi Logistics Co",              type:"client",     contactPerson:"Khalid Otaibi",   phone:"+966 11 220 4500",email:"ap@saudilog.sa",          address:"Riyadh, KSA",                   bankName:"Al Rajhi Bank",    bankAccount:"SA8055000",  bankIBAN:"SA0380000000608010167519", taxNumber:"311223344500003", status:"active",   notes:"Cross-border freight client." },
+  { partyId:"PTY-009", name:"Reem Trading FZE",                type:"client",     contactPerson:"Noura Salem",     phone:"+971 4 555 8821", email:"finance@reemtrading.ae",  address:"DMCC, Dubai",                   bankName:"Emirates NBD",     bankAccount:"1029988120", bankIBAN:"AE470331029988120000001", taxNumber:"100778899000003", status:"active",   notes:"Warehousing & distribution client." },
+  { partyId:"PTY-010", name:"Horizon Retail Group",            type:"client",     contactPerson:"James Whitfield", phone:"+971 4 702 3300", email:"payables@horizonretail.ae",address:"Business Bay, Dubai",          bankName:"HSBC",             bankAccount:"0445120098", bankIBAN:"AE790200000445120098000", taxNumber:"100990011200003", status:"active",   notes:"Retail last-mile delivery client." },
+  { partyId:"PTY-011", name:"Emirates NBD",                    type:"bank",       contactPerson:"Relationship Mgr",phone:"+971 4 609 2222", email:"corporate@emiratesnbd.com",address:"Deira, Dubai",                 bankName:"Emirates NBD",     bankAccount:"1010001000", bankIBAN:"AE070331010001000000001", taxNumber:"",                status:"active",   notes:"Primary operating bank." },
+  { partyId:"PTY-012", name:"Meridian Petty Cash",            type:"other",      contactPerson:"Priya Menon",     phone:"",                email:"",                        address:"Head Office, DMCC",             bankName:"",                 bankAccount:"",           bankIBAN:"",                        taxNumber:"",                status:"active",   notes:"Petty-cash float custodian." },
+];
+
+// ── Cash Book (physical cash + bank receipts/payments) ───────────────────────
+const cashBook = [
+  { entryId:"CB-1001", date:"2026-05-20", entryType:"receipt", category:"Client Payment",   reference:"INV settlement",   description:"Receipt — Reem Trading FZE, warehousing April",     party:"Reem Trading FZE",          amount:48500, paymentMode:"bank_transfer", notes:"Settled against April statement." },
+  { entryId:"CB-1002", date:"2026-05-19", entryType:"payment", category:"Fuel",             reference:"Fleet card",       description:"Payment — Emirates Fuel & Lube, fleet diesel",       party:"Emirates Fuel & Lube",      amount:6200,  paymentMode:"bank_transfer", notes:"Weekly fleet fuel top-up." },
+  { entryId:"CB-1003", date:"2026-05-18", entryType:"receipt", category:"Client Payment",   reference:"Horizon May-01",   description:"Receipt — Horizon Retail Group, last-mile May",      party:"Horizon Retail Group",      amount:31250, paymentMode:"cheque",        notes:"Cheque deposited Emirates NBD." },
+  { entryId:"CB-1004", date:"2026-05-17", entryType:"payment", category:"Utilities",        reference:"DEWA Apr",         description:"Payment — DEWA, Al Quoz DC electricity",             party:"DEWA",                      amount:4180,  paymentMode:"bank_transfer", notes:"April consumption." },
+  { entryId:"CB-1005", date:"2026-05-16", entryType:"payment", category:"Office Supplies",  reference:"PO-GO-0455",       description:"Payment — Gulf Office Supplies, pantry & stationery",party:"Gulf Office Supplies LLC",  amount:1340,  paymentMode:"cheque",        notes:"" },
+  { entryId:"CB-1006", date:"2026-05-15", entryType:"payment", category:"Telecom",          reference:"Etisalat May",     description:"Payment — Etisalat, office internet & lines",        party:"Etisalat",                  amount:2750,  paymentMode:"bank_transfer", notes:"" },
+  { entryId:"CB-1007", date:"2026-05-14", entryType:"receipt", category:"Client Payment",   reference:"SLC freight 042",  description:"Receipt — Saudi Logistics Co, cross-border freight", party:"Saudi Logistics Co",        amount:72000, paymentMode:"bank_transfer", notes:"SAR converted at AED." },
+  { entryId:"CB-1008", date:"2026-05-13", entryType:"payment", category:"Facilities",       reference:"AQFM-MAY",         description:"Payment — Al Quoz Facilities Mgmt, warehouse upkeep",party:"Al Quoz Facilities Mgmt",   amount:5600,  paymentMode:"bank_transfer", notes:"Monthly maintenance contract." },
+  { entryId:"CB-1009", date:"2026-05-12", entryType:"payment", category:"Customs",          reference:"DC-DEC-9912",      description:"Payment — Dubai Customs, import duties batch",       party:"Dubai Customs",             amount:9850,  paymentMode:"bank_transfer", notes:"May import clearance." },
+  { entryId:"CB-1010", date:"2026-05-11", entryType:"payment", category:"Petty Cash",       reference:"PC-float",         description:"Payment — petty cash float replenishment",           party:"Meridian Petty Cash",       amount:2000,  paymentMode:"cash",          notes:"Top-up to AED 2,000 float." },
+  { entryId:"CB-1011", date:"2026-05-09", entryType:"receipt", category:"Client Payment",   reference:"Reem May-adv",     description:"Receipt — Reem Trading FZE, May advance",            party:"Reem Trading FZE",          amount:15000, paymentMode:"bank_transfer", notes:"Advance against May storage." },
+  { entryId:"CB-1012", date:"2026-05-07", entryType:"payment", category:"Licence",          reference:"JAFZA renewal",    description:"Payment — JAFZA, trade licence annual renewal",      party:"Jebel Ali Free Zone Authority", amount:18750, paymentMode:"cheque",    notes:"Annual establishment card + licence." },
+  { entryId:"CB-1013", date:"2026-05-05", entryType:"payment", category:"Fuel",             reference:"Fleet card",       description:"Payment — Emirates Fuel & Lube, fleet diesel",       party:"Emirates Fuel & Lube",      amount:5840,  paymentMode:"bank_transfer", notes:"" },
+  { entryId:"CB-1014", date:"2026-05-03", entryType:"receipt", category:"Client Payment",   reference:"Horizon Apr-final",description:"Receipt — Horizon Retail Group, April balance",      party:"Horizon Retail Group",      amount:22400, paymentMode:"bank_transfer", notes:"April closing balance." },
+];
+
+// ── Day Book (general journal — accruals, payroll, bank, adjustments) ─────────
+const dayBook = [
+  { entryId:"DB-2001", date:"2026-05-21", entryType:"income",          account:"Freight Revenue",        description:"Accrued freight revenue — Saudi Logistics Co",     party:"Saudi Logistics Co",        debit:0,     credit:72000, reference:"SLC freight 042", notes:"Revenue recognised on delivery." },
+  { entryId:"DB-2002", date:"2026-05-21", entryType:"salary",          account:"Salaries & Wages",       description:"May 2026 payroll accrual — all departments",       party:"",                          debit:486500,credit:0,     reference:"PR-2026-05",      notes:"Gross payroll for May run." },
+  { entryId:"DB-2003", date:"2026-05-20", entryType:"bank_deposit",    account:"Bank — Emirates NBD",    description:"Deposit — Reem Trading receipt cleared",           party:"Reem Trading FZE",          debit:48500, credit:0,     reference:"CB-1001",         notes:"Cash Book CB-1001 deposited." },
+  { entryId:"DB-2004", date:"2026-05-19", entryType:"expense",         account:"Fleet — Fuel",           description:"Fuel expense accrual — Emirates Fuel & Lube",      party:"Emirates Fuel & Lube",      debit:6200,  credit:0,     reference:"CB-1002",         notes:"" },
+  { entryId:"DB-2005", date:"2026-05-18", entryType:"expense",         account:"Utilities",              description:"Electricity expense — DEWA, Al Quoz DC",           party:"DEWA",                      debit:4180,  credit:0,     reference:"CB-1004",         notes:"April consumption posted May." },
+  { entryId:"DB-2006", date:"2026-05-17", entryType:"bank_withdrawal", account:"Bank — Emirates NBD",    description:"Withdrawal — JAFZA licence renewal cheque",        party:"Jebel Ali Free Zone Authority", debit:0, credit:18750,    reference:"CB-1012",         notes:"Cheque cleared." },
+  { entryId:"DB-2007", date:"2026-05-16", entryType:"expense",         account:"Telecom",                description:"Internet & lines — Etisalat May",                  party:"Etisalat",                  debit:2750,  credit:0,     reference:"CB-1006",         notes:"" },
+  { entryId:"DB-2008", date:"2026-05-15", entryType:"income",          account:"Storage Revenue",        description:"Warehousing revenue — Reem Trading, April",        party:"Reem Trading FZE",          debit:0,     credit:48500, reference:"CB-1001",         notes:"" },
+  { entryId:"DB-2009", date:"2026-05-14", entryType:"transfer",        account:"Inter-account Transfer", description:"Transfer — operating to payroll account",          party:"Emirates NBD",              debit:486500,credit:486500,reference:"TRF-0519",        notes:"Funded payroll account for May run." },
+  { entryId:"DB-2010", date:"2026-05-13", entryType:"expense",         account:"Facilities & Maintenance",description:"Warehouse upkeep — Al Quoz Facilities Mgmt",      party:"Al Quoz Facilities Mgmt",   debit:5600,  credit:0,     reference:"CB-1008",         notes:"" },
+  { entryId:"DB-2011", date:"2026-05-12", entryType:"expense",         account:"Customs & Duties",       description:"Import duties batch — Dubai Customs",              party:"Dubai Customs",             debit:9850,  credit:0,     reference:"CB-1009",         notes:"" },
+  { entryId:"DB-2012", date:"2026-05-10", entryType:"adjustment",      account:"FX Gain/Loss",           description:"FX adjustment — SAR receipt revaluation",          party:"Saudi Logistics Co",        debit:0,     credit:640,   reference:"FX-0510",         notes:"Realised FX gain on SLC settlement." },
+  { entryId:"DB-2013", date:"2026-05-08", entryType:"expense",         account:"Office Supplies",        description:"Stationery & pantry — Gulf Office Supplies",       party:"Gulf Office Supplies LLC",  debit:1340,  credit:0,     reference:"CB-1005",         notes:"" },
+  { entryId:"DB-2014", date:"2026-05-06", entryType:"other",           account:"Petty Cash",             description:"Petty cash float replenishment",                   party:"Meridian Petty Cash",       debit:2000,  credit:0,     reference:"CB-1010",         notes:"" },
+];
+
 // ── Documents & Contracts ─────────────────────────────────────────────────────
 const documents = [
   // Employment Contracts
@@ -766,6 +821,9 @@ async function seed() {
     Benefit.deleteMany({}),
     Shift.deleteMany({}),
     Expense.deleteMany({}),
+    Party.deleteMany({}),
+    CashBook.deleteMany({}),
+    DayBook.deleteMany({}),
     Document.deleteMany({}),
     Course.deleteMany({}),
     ReviewCycle.deleteMany({}),
@@ -829,6 +887,15 @@ async function seed() {
 
   await Expense.insertMany(expenses);
   console.log(`   ✓ ${expenses.length} expense claims`);
+
+  await Party.insertMany(parties);
+  console.log(`   ✓ ${parties.length} parties`);
+
+  await CashBook.insertMany(cashBook);
+  console.log(`   ✓ ${cashBook.length} cash book entries`);
+
+  await DayBook.insertMany(dayBook);
+  console.log(`   ✓ ${dayBook.length} day book entries`);
 
   await Document.insertMany(documents);
   console.log(`   ✓ ${documents.length} documents & contracts`);

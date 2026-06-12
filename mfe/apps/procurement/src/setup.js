@@ -7,9 +7,10 @@
  */
 import { jsPDF } from "jspdf";
 import "jspdf-autotable"; // augments jsPDF.prototype.autoTable
-import { API_BASE } from "@meridian/api";
+import { API_BASE, installAuthFetch } from "@meridian/api";
 
 if (typeof window !== "undefined") {
   window.API = API_BASE;
+  installAuthFetch();
   window.jspdf = window.jspdf || { jsPDF };
 }

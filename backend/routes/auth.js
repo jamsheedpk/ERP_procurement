@@ -2,6 +2,7 @@ const express  = require("express");
 const jwt      = require("jsonwebtoken");
 const User     = require("../models/User");
 const Employee = require("../models/Employee");
+const { adminOnly } = require("../middleware/auth");
 
 const router  = express.Router();
 const SECRET  = process.env.JWT_SECRET || "hrm_dev_secret_2026";
@@ -54,7 +55,7 @@ router.get("/me", async (req, res) => {
 });
 
 /* GET /api/auth/users — list all system users (admin only) */
-router.get("/users", async (req, res) => {
+router.get("/users", adminOnly, async (req, res) => {
   try {
     const users = await User.find({}).select("-password").sort({ createdAt: 1 });
     res.json(users.map(u => ({
@@ -74,7 +75,7 @@ router.get("/users", async (req, res) => {
 });
 
 /* PATCH /api/auth/users/:id — update role or active status */
-router.patch("/users/:id", async (req, res) => {
+router.patch("/users/:id", adminOnly, async (req, res) => {
   try {
     const { role, userRole, active } = req.body;
     const update = {};

@@ -1,0 +1,8 @@
+.core-shell { display: flex; min-height: 100vh; }
+.core-subnav { width: 184px; flex-shrink: 0; border-right: 1px solid var(--border-subtle); background: var(--bg-surface); padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; align-self: flex-start; max-height: 100vh; overflow: auto; }
+.core-subnav-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; border: none; background: transparent; color: var(--fg-2); font-size: 12.5px; font-weight: 500; cursor: pointer; text-align: left; font-family: var(--font-sans); }
+.core-subnav-item:hover { background: var(--ink-50); }
+.core-subnav-item--active { background: var(--brand-burgundy); color: #fff; }
+.core-content { flex: 1; min-width: 0; overflow: auto; }
+.core-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 80vh; color: var(--fg-3); font-size: 13px; }
+.core-spin { width: 34px; height: 34px; border: 3px solid var(--plum-100); border-top-color: var(--brand-burgundy); border-radius: 50%; animation: spin .8s linear infinite; }

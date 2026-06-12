@@ -24,6 +24,34 @@ function authHeaders(extra) {
   return { "Content-Type": "application/json", ...(t ? { Authorization: `Bearer ${t}` } : {}), ...(extra || {}) };
 }
 
+/**
+ * The wholesale-ported monolith pages call `fetch(`${window.API}/...`)` directly,
+ * without auth headers. Rather than rewrite hundreds of call sites, install a one-time
+ * global fetch shim that attaches the stored JWT to any request hitting our API base.
+ * Idempotent and safe: it never overrides an Authorization header a caller already set,
+ * and it leaves non-API requests untouched. Remotes call this from their setup.js.
+ */
+let _authFetchInstalled = false;
+export function installAuthFetch() {
+  if (_authFetchInstalled || typeof window === "undefined" || typeof window.fetch !== "function") return;
+  _authFetchInstalled = true;
+  const orig = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    try {
+      const url = typeof input === "string" ? input : (input && input.url) || "";
+      if (url.indexOf(API_BASE) === 0) {
+        const token = getToken();
+        if (token) {
+          const headers = new Headers((init && init.headers) || (typeof input !== "string" && input && input.headers) || {});
+          if (!headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+          init = { ...(init || {}), headers };
+        }
+      }
+    } catch { /* fall through to original fetch */ }
+    return orig(input, init);
+  };
+}
+
 async function handle(res) {
   let body = null;
   try { body = await res.json(); } catch { /* empty body */ }
