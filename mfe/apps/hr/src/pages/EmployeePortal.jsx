@@ -103,7 +103,7 @@ function LeaveChip({ status }) {
 }
 
 /* ── Main portal shell ────────────────────────────────────────────────── */
-function EmployeePortal({ authUser, token, onLogout }) {
+function EmployeePortal({ authUser, token, onLogout, embedded }) {
   const [profile,    setProfile]    = useStateEP(null);
   const [leaves,     setLeaves]     = useStateEP([]);
   const [leaveTypes, setLeaveTypes] = useStateEP([]);
@@ -112,11 +112,19 @@ function EmployeePortal({ authUser, token, onLogout }) {
   const [loading,    setLoading]    = useStateEP(true);
   const [error,      setError]      = useStateEP(null);
   const [route,      setRoute]      = useStateEP("home");
+  const [collapsed,  setCollapsed]  = useStateEP(() => {
+    try { return localStorage.getItem("meridian_ep_collapsed") === "1"; } catch { return false; }
+  });
+  const toggleCollapsed = () => setCollapsed(c => {
+    try { localStorage.setItem("meridian_ep_collapsed", c ? "0" : "1"); } catch { /* private mode */ }
+    return !c;
+  });
   const [showReq,    setShowReq]    = useStateEP(false);
 
   useEffectEP(() => {
     const headers = { Authorization: `Bearer ${token}` };
     let myName = authUser.name;
+    let myEmpId = authUser.empId; // refreshed from my-profile — the login-time copy can be stale (e.g. admin linked after sign-in)
     Promise.all([
       fetch(`${API}/auth/my-profile`, { headers }).then(r => r.json()),
       fetch(`${API}/leave-types`).then(r => r.json()),
@@ -124,6 +132,7 @@ function EmployeePortal({ authUser, token, onLogout }) {
       if (profileData.message) throw new Error(profileData.message);
       setProfile(profileData.employee);
       myName = profileData.employee.name;
+      myEmpId = profileData.employee.empId;
       setLeaveTypes(types);
       return Promise.all([
         fetch(`${API}/leave-requests?empId=${profileData.employee.empId}`).then(r => r.json()),
@@ -132,7 +141,7 @@ function EmployeePortal({ authUser, token, onLogout }) {
       ]);
     }).then(([lvs, payrollRun, allProjects]) => {
       setLeaves(lvs);
-      const line = (payrollRun.lines || []).find(l => l.empId === authUser.empId);
+      const line = (payrollRun.lines || []).find(l => l.empId === myEmpId);
       setPayslip(line || null);
       // Projects this employee is assigned to (as lead or site engineer), matched by name
       const mine = (Array.isArray(allProjects) ? allProjects : []).filter(p =>
@@ -179,38 +188,74 @@ function EmployeePortal({ authUser, token, onLogout }) {
   else if (route === "profile")  page = <EmpProfile  {...pageProps} />;
   else page = <EmpHome {...pageProps} />;
 
+  // Embedded mode (admin "My Portal" inside the HR app): the shell + HR sidebars
+  // already frame the page, so swap the portal's own sidebar for a tab strip.
+  if (embedded) return (
+    <div className="ep-embedded">
+      <div className="ep-tabs">
+        {EP_NAV.flatMap(sec => sec.items).map(it => (
+          <button
+            key={it.id}
+            className={"ep-tab" + (route === it.id ? " ep-tab--active" : "")}
+            onClick={() => setRoute(it.id)}
+          >
+            <Icon name={it.icon} size={15} />
+            <span>{it.label}</span>
+          </button>
+        ))}
+      </div>
+      {page}
+      {showReq && route !== "leave" && (
+        <RequestLeaveModal
+          employee={emp} leaveTypes={leaveTypes} token={token}
+          onClose={() => setShowReq(false)}
+          onSaved={(lv) => { addLeave(lv); setShowReq(false); }}
+        />
+      )}
+    </div>
+  );
+
   return (
-    <div className="ep-shell">
+    <div className={"ep-shell" + (collapsed ? " ep-shell--collapsed" : "")}>
       {/* Sidebar */}
       <aside className="ep-sidebar">
         <div className="ep-sidebar-brand">
           <div className="ep-sidebar-mark">M</div>
-          <div>
-            <div className="ep-sidebar-name">Meridian ERP</div>
-            <div className="ep-sidebar-sub">Employee Portal</div>
-          </div>
+          {!collapsed && (
+            <div>
+              <div className="ep-sidebar-name">Meridian ERP</div>
+              <div className="ep-sidebar-sub">Employee Portal</div>
+            </div>
+          )}
+          <button className="ep-collapse" title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={toggleCollapsed}>
+            <Icon name={collapsed ? "panel-left-open" : "panel-left-close"} size={14} />
+          </button>
         </div>
 
-        <div className="ep-sidebar-avatar">
+        <div className="ep-sidebar-avatar" title={collapsed ? `${emp.name} · ${emp.empId}` : undefined}>
           <Avatar name={emp.name} color={emp.av} />
-          <div style={{ minWidth: 0 }}>
-            <div className="ep-sidebar-emp-name">{emp.name}</div>
-            <div className="ep-sidebar-emp-sub">{emp.empId} · {emp.dept}</div>
-          </div>
+          {!collapsed && (
+            <div style={{ minWidth: 0 }}>
+              <div className="ep-sidebar-emp-name">{emp.name}</div>
+              <div className="ep-sidebar-emp-sub">{emp.empId} · {emp.dept}</div>
+            </div>
+          )}
         </div>
 
         <nav className="ep-nav">
           {EP_NAV.map((sec, si) => (
             <div key={si} className="ep-nav-section">
-              <div className="ep-nav-heading">{sec.sec}</div>
+              {!collapsed && <div className="ep-nav-heading">{sec.sec}</div>}
               {sec.items.map(it => (
                 <button
                   key={it.id}
                   className={"ep-nav-item" + (route === it.id ? " ep-nav-item--active" : "")}
+                  title={collapsed ? it.label : undefined}
                   onClick={() => setRoute(it.id)}
                 >
                   <Icon name={it.icon} size={16} />
-                  <span>{it.label}</span>
+                  {!collapsed && <span>{it.label}</span>}
                 </button>
               ))}
             </div>
@@ -218,10 +263,10 @@ function EmployeePortal({ authUser, token, onLogout }) {
         </nav>
 
         <div className="ep-sidebar-foot">
-          <EpThemePicker />
-          <button className="ep-logout" onClick={onLogout}>
+          {!collapsed && <EpThemePicker />}
+          <button className="ep-logout" onClick={onLogout} title={collapsed ? "Sign out" : undefined}>
             <Icon name="log-out" size={14} />
-            <span>Sign out</span>
+            {!collapsed && <span>Sign out</span>}
           </button>
         </div>
       </aside>

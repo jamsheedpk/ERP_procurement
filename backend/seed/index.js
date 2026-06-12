@@ -31,8 +31,9 @@ const SalaryStructure    = require("../models/SalaryStructure");
 
 const defaultUsers = [
   // ── Admin accounts ─────────────────────────────────────────────────────────
-  { name: "Fatima Al-Mansoori", email: "admin@meridian.ae",   password: "admin123", userRole: "admin",    role: "Head of People",   avatar: { bg: "#F4DDE8", fg: "#6F1947" } },
-  { name: "Daniyal Khan",       email: "daniyal@meridian.ae", password: "admin123", userRole: "admin",    role: "IT Administrator", avatar: { bg: "#E8EFF8", fg: "#163E73" } },
+  // Admins are linked to their own employee records so "My Portal" / "My Profile" works for them too.
+  { name: "Fatima Al-Mansoori", email: "admin@meridian.ae",   password: "admin123", userRole: "admin",    empId: "EMP-2840", role: "Head of People",   avatar: { bg: "#F4DDE8", fg: "#6F1947" } },
+  { name: "Daniyal Khan",       email: "daniyal@meridian.ae", password: "admin123", userRole: "admin",    empId: "EMP-3122", role: "IT Administrator", avatar: { bg: "#E8EFF8", fg: "#163E73" } },
   // ── Employee accounts (password: emp123) ───────────────────────────────────
   { name: "Aarav Sharma",       email: "aarav.s@meridian.ae",    password: "emp123", userRole: "employee", empId: "EMP-2451", role: "Senior Logistics Coordinator", avatar: { bg: "#F4DDE8", fg: "#6F1947" } },
   { name: "Layla Haddad",       email: "layla.h@meridian.ae",    password: "emp123", userRole: "employee", empId: "EMP-2390", role: "Sales Director",               avatar: { bg: "#F5989D", fg: "#42102B" } },

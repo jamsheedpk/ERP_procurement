@@ -22,7 +22,7 @@ import EmployeePortal from "./pages/EmployeePortal.jsx";
 
 // Employee self-service portal — reads the signed-in user the shell stored in
 // localStorage. Standalone (no session) it shows a sign-in notice instead of crashing.
-function PortalRoute() {
+function PortalRoute({ embedded }) {
   const token = getToken();
   let authUser = null;
   try { authUser = JSON.parse(localStorage.getItem(USER_KEY)); } catch { authUser = null; }
@@ -33,7 +33,7 @@ function PortalRoute() {
     localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY);
     window.location.reload();
   };
-  return <EmployeePortal authUser={authUser} token={token} onLogout={onLogout} />;
+  return <EmployeePortal authUser={authUser} token={token} onLogout={onLogout} embedded={embedded} />;
 }
 
 const PAGES = [
@@ -76,7 +76,7 @@ function AdminApp() {
     case "benefits": page = <BenefitsPage data={data} />; break;
     case "perf":     page = <PerformancePage data={data} />; break;
     case "learn":    page = <TrainingPage data={data} />; break;
-    case "portal":   page = <PortalRoute />; break;
+    case "portal":   page = <PortalRoute embedded />; break;
     default:         page = <PeoplePage data={data} onOpenEmployee={setOpenEmployee} onAdd={handleAdd} />;
   }
 

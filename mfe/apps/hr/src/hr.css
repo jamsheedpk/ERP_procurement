@@ -21,3 +21,34 @@
 }
 .ep-swatch:hover { transform: scale(1.1); }
 .ep-swatch--active { box-shadow: 0 0 0 2px var(--plum-900), 0 0 0 4px rgba(244,221,232,0.55); }
+
+/* ── Employee portal sidebar collapse ── */
+.ep-shell { transition: grid-template-columns .18s ease; }
+.ep-shell--collapsed { grid-template-columns: 60px 1fr; }
+.ep-collapse {
+  margin-left: auto; flex-shrink: 0; width: 24px; height: 24px; border-radius: 6px;
+  border: none; background: transparent; color: rgba(244,221,232,0.45); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 140ms, color 140ms;
+}
+.ep-collapse:hover { background: rgba(255,255,255,0.08); color: rgba(244,221,232,0.85); }
+.ep-shell--collapsed .ep-sidebar-brand { flex-direction: column; gap: 8px; align-items: center; }
+.ep-shell--collapsed .ep-collapse { margin-left: 0; }
+.ep-shell--collapsed .ep-sidebar-avatar { justify-content: center; }
+.ep-shell--collapsed .ep-nav-item { justify-content: center; padding: 9px 0; }
+.ep-shell--collapsed .ep-logout { justify-content: center; padding: 8px 0; }
+
+/* ── Embedded employee portal (admin "My Portal") — tab strip replaces the portal sidebar ── */
+.ep-embedded { min-height: 100%; }
+.ep-tabs {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  padding: 14px 28px 0;
+}
+.ep-tab {
+  display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px;
+  border-radius: 999px; border: 1px solid var(--border-subtle); background: var(--bg-surface);
+  color: var(--fg-2); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  font-family: var(--font-sans); transition: background 140ms, color 140ms;
+}
+.ep-tab:hover { background: var(--ink-50); color: var(--fg-1); }
+.ep-tab--active { background: var(--brand-burgundy); border-color: var(--brand-burgundy); color: #fff; }
