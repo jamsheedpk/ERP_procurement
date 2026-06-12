@@ -64,15 +64,10 @@ app.use("/api", notFound);
 /* ── Uploaded files ─────────────────────────────────── */
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-/* ── Static assets & frontend files (no-cache in dev) ── */
-app.use(express.static(__dirname, {
-  etag: false,
-  lastModified: false,
-  setHeaders(res) {
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-    res.setHeader("Pragma", "no-cache");
-  },
-}));
+/* ── No frontend here anymore — the UI is the micro-frontend shell ── */
+app.get("/", (req, res) => {
+  res.json({ service: "Meridian ERP API", api: "/api", ui: "http://localhost:5100 (mfe shell — `cd mfe && npm run dev`)" });
+});
 
 /* ── Central error handler (must be last) ─────────────── */
 app.use(errorHandler);
