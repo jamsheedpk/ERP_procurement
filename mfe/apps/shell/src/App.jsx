@@ -28,11 +28,18 @@ function RemoteRoute({ name, children }) {
 // Admin workspace — full host chrome (sidebar + topbar) around the domain remotes.
 // Employees never reach this; they get the portal full-screen (see App below).
 function Layout({ user, onLogout }) {
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem("meridian_sidebar_collapsed") === "1"; } catch { return false; }
+  });
+  const toggleSidebar = () => setCollapsed((c) => {
+    try { localStorage.setItem("meridian_sidebar_collapsed", c ? "0" : "1"); } catch { /* private mode */ }
+    return !c;
+  });
   return (
-    <div className="shell-root">
-      <Sidebar user={user} />
+    <div className={"shell-root" + (collapsed ? " shell-root--collapsed" : "")}>
+      <Sidebar user={user} collapsed={collapsed} />
       <div className="shell-main">
-        <Topbar user={user} onLogout={onLogout} />
+        <Topbar user={user} onLogout={onLogout} collapsed={collapsed} onToggleSidebar={toggleSidebar} />
         <main className="shell-content">
         <Routes>
           <Route path="/" element={<Navigate to="/core" replace />} />

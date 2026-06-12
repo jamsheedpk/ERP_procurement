@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Icon } from "@meridian/ui";
 import { ACCENT_THEMES, getSavedAccent, setAccent } from "@meridian/theme";
 import { navFor } from "./Sidebar.jsx";
+import { useNotifications } from "./notifications.js";
 
 const initials = (name) => (name || "?").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
@@ -11,24 +12,44 @@ const initials = (name) => (name || "?").split(" ").map((w) => w[0]).slice(0, 2)
  * the active section, a (visual) global search, notifications, and the user menu
  * (which owns sign-out, so the sidebar stays focused on navigation).
  */
-export function Topbar({ user, onLogout }) {
+export function Topbar({ user, onLogout, collapsed, onToggleSidebar }) {
   const loc = useLocation();
+  const navigate = useNavigate();
   const current = navFor(user).find((n) => loc.pathname.startsWith(n.to));
   const [open, setOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [accent, setAccentState] = useState(getSavedAccent);
   const ref = useRef(null);
+  const notifRef = useRef(null);
+  const { items: notifs, seen, unseenCount, markAllSeen, refresh } = useNotifications();
 
   const pickAccent = (a) => { setAccent(a); setAccentState(a); };
 
   useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const h = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+    };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  const openNotif = () => {
+    setNotifOpen((o) => !o);
+    if (!notifOpen) refresh();
+  };
+  const goTo = (item) => {
+    setNotifOpen(false);
+    navigate(item.to);
+  };
+
   return (
     <header className="shell-topbar">
       <div className="shell-crumbs">
+        <button className="shell-icon-btn shell-collapse-btn" title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={onToggleSidebar}>
+          <Icon name={collapsed ? "panel-left-open" : "panel-left-close"} size={16} />
+        </button>
         <Icon name={current?.icon || "layout-grid"} size={15} />
         <span className="shell-crumb-current">{current?.label || "Workspace"}</span>
       </div>
@@ -40,10 +61,43 @@ export function Topbar({ user, onLogout }) {
           <kbd>⌘K</kbd>
         </div>
 
-        <button className="shell-icon-btn" title="Notifications" aria-label="Notifications">
-          <Icon name="bell" size={17} />
-          <span className="shell-dot" />
-        </button>
+        <div className="shell-usermenu" ref={notifRef}>
+          <button className="shell-icon-btn" title="Notifications" aria-label="Notifications"
+            aria-haspopup="menu" aria-expanded={notifOpen} onClick={openNotif}>
+            <Icon name="bell" size={17} />
+            {unseenCount > 0 && <span className="shell-badge">{unseenCount > 99 ? "99+" : unseenCount}</span>}
+          </button>
+          {notifOpen && (
+            <div className="shell-dropdown shell-notifs" role="menu">
+              <div className="shell-notifs-head">
+                <span>Notifications{notifs.length ? ` · ${notifs.length}` : ""}</span>
+                {unseenCount > 0 && (
+                  <button className="shell-notifs-clear" onClick={markAllSeen}>Mark all read</button>
+                )}
+              </div>
+              <div className="shell-notifs-list">
+                {notifs.length === 0 && (
+                  <div className="shell-notifs-empty">
+                    <Icon name="check-circle-2" size={20} color="var(--success-700, #1F8A52)" />
+                    <span>You're all caught up</span>
+                  </div>
+                )}
+                {notifs.map((n) => (
+                  <button key={n.id} className="shell-notif-item" role="menuitem" onClick={() => goTo(n)}>
+                    <span className="shell-notif-ico" style={{ color: n.color }}>
+                      <Icon name={n.icon} size={15} />
+                    </span>
+                    <span className="shell-notif-meta">
+                      <span className="shell-notif-title">{n.title}</span>
+                      <span className="shell-notif-sub">{n.sub}</span>
+                    </span>
+                    {!seen.has(n.id) && <span className="shell-notif-unread" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="shell-usermenu" ref={ref}>
           <button className="shell-userchip" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open}>

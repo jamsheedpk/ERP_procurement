@@ -17,31 +17,40 @@ const ALL_NAV = [
 export const roleOf = (user) => (user?.userRole === "employee" ? "employee" : "admin");
 export const navFor = (user) => ALL_NAV.filter((n) => n.roles.includes(roleOf(user)));
 
-export function Sidebar({ user }) {
+export function Sidebar({ user, collapsed }) {
   const nav = navFor(user);
   return (
     <aside className="shell-sidebar">
       <div className="shell-brand">
         <div className="shell-mark">M</div>
-        <div>
-          <div className="shell-brand-name">Meridian ERP</div>
-          <div className="shell-brand-sub">Logistics DMCC</div>
-        </div>
+        {!collapsed && (
+          <div>
+            <div className="shell-brand-name">Meridian ERP</div>
+            <div className="shell-brand-sub">Logistics DMCC</div>
+          </div>
+        )}
       </div>
 
-      <div className="shell-nav-label">{roleOf(user) === "employee" ? "My space" : "Workspace"}</div>
+      {!collapsed && <div className="shell-nav-label">{roleOf(user) === "employee" ? "My space" : "Workspace"}</div>}
       <nav className="shell-nav">
         {nav.map((n) => (
-          <NavLink key={n.label} to={n.to} className={({ isActive }) => "shell-nav-item" + (isActive ? " shell-nav-item--active" : "")}>
+          <NavLink key={n.label} to={n.to} title={collapsed ? n.label : undefined}
+            className={({ isActive }) => "shell-nav-item" + (isActive ? " shell-nav-item--active" : "")}>
             <span className="shell-nav-ico"><Icon name={n.icon} size={17} /></span>
-            <span>{n.label}</span>
+            {!collapsed && <span>{n.label}</span>}
           </NavLink>
         ))}
       </nav>
 
       <div className="shell-foot">
-        <div className="shell-foot-brand">Meridian Logistics DMCC</div>
-        <div className="shell-foot-ver">Enterprise · v0.1</div>
+        {collapsed ? (
+          <div className="shell-foot-brand" style={{ textAlign: "center" }} title="Meridian Logistics DMCC · Enterprise v0.1">·</div>
+        ) : (
+          <>
+            <div className="shell-foot-brand">Meridian Logistics DMCC</div>
+            <div className="shell-foot-ver">Enterprise · v0.1</div>
+          </>
+        )}
       </div>
     </aside>
   );

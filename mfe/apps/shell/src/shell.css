@@ -1,5 +1,12 @@
 /* ── App frame ──────────────────────────────────────────────────────────── */
-.shell-root { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; background: var(--bg-canvas); }
+.shell-root { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; background: var(--bg-canvas); transition: grid-template-columns .18s ease; }
+.shell-root--collapsed { grid-template-columns: 64px 1fr; }
+.shell-root--collapsed .shell-sidebar { padding: 16px 10px; align-items: center; }
+.shell-root--collapsed .shell-brand { padding: 6px 0 20px; justify-content: center; }
+.shell-root--collapsed .shell-nav { width: 100%; }
+.shell-root--collapsed .shell-nav-item { justify-content: center; padding: 10px 0; }
+.shell-root--collapsed .shell-nav-item--active::before { left: -10px; }
+.shell-root--collapsed .shell-foot { width: 100%; padding: 12px 0 4px; }
 .shell-main { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 .shell-content { flex: 1; min-height: 0; overflow: auto; }
 
@@ -216,3 +223,49 @@
 .login-demo:hover { border-color: var(--brand-burgundy); background: var(--plum-50); color: var(--fg-1); }
 .login-demo-label { display: block; font-size: 12px; font-weight: 650; color: var(--fg-1); font-family: var(--font-sans); }
 .login-demo-mail { display: block; font-size: 10.5px; color: var(--fg-4); margin-top: 1px; }
+
+/* ── Notifications dropdown ── */
+.shell-badge {
+  position: absolute; top: 3px; right: 3px; min-width: 15px; height: 15px; padding: 0 4px;
+  border-radius: 999px; background: var(--brand-magenta); color: #fff;
+  font-size: 9.5px; font-weight: 800; line-height: 15px; text-align: center;
+  border: 1.5px solid var(--bg-surface); box-sizing: content-box;
+}
+.shell-notifs { width: 340px; padding: 0; overflow: hidden; }
+.shell-notifs-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px; border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px; font-weight: 700; color: var(--fg-1);
+}
+.shell-notifs-clear {
+  border: none; background: transparent; cursor: pointer; padding: 0;
+  font-size: 11.5px; font-weight: 600; color: var(--brand-burgundy);
+}
+.shell-notifs-clear:hover { text-decoration: underline; }
+.shell-notifs-list { max-height: 380px; overflow-y: auto; padding: 6px; }
+.shell-notifs-empty {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 26px 0; font-size: 12.5px; color: var(--fg-3);
+}
+.shell-notif-item {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 9px 10px;
+  border: none; border-radius: 8px; background: transparent; cursor: pointer; text-align: left;
+}
+.shell-notif-item:hover { background: var(--ink-50); }
+.shell-notif-ico {
+  width: 28px; height: 28px; border-radius: 8px; background: var(--ink-50);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+}
+.shell-notif-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.shell-notif-title {
+  font-size: 12.5px; font-weight: 600; color: var(--fg-1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.shell-notif-sub {
+  font-size: 11px; color: var(--fg-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.shell-notif-unread {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--brand-magenta);
+  flex-shrink: 0; margin-top: 6px;
+}
