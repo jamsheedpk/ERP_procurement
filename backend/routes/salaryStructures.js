@@ -5,7 +5,7 @@ const SalaryChange    = require("../models/SalaryChange");
 
 router.get("/", async (req, res) => {
   try {
-    const docs = await SalaryStructure.find().sort({ empName: 1 });
+    const docs = await SalaryStructure.find().sort({ empName: 1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -64,7 +64,7 @@ router.get("/changes/all", async (req, res) => {
     const filter = {};
     if (req.query.empId) filter.empId = req.query.empId;
     if (req.query.changeType) filter.changeType = req.query.changeType;
-    const docs = await SalaryChange.find(filter).sort({ createdAt: -1 }).limit(200);
+    const docs = await SalaryChange.find(filter).sort({ createdAt: -1 }).limit(200).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

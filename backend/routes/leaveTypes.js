@@ -4,7 +4,7 @@ const LeaveType = require("../models/LeaveType");
 
 router.get("/", async (req, res) => {
   try {
-    const docs = await LeaveType.find().sort({ typeId: 1 });
+    const docs = await LeaveType.find().sort({ typeId: 1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

@@ -8,7 +8,7 @@ router.get("/", async (req, res) => {
     const filter = {};
     if (jobId) filter.jobId = jobId;
     if (stage) filter.stage = stage;
-    const docs = await Candidate.find(filter).sort({ createdAt: -1 });
+    const docs = await Candidate.find(filter).sort({ createdAt: -1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

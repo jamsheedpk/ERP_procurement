@@ -28,4 +28,8 @@ const employeeSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+employeeSchema.index({ status: 1 });
+employeeSchema.index({ dept: 1 });
+employeeSchema.index({ name: 1 });
+
 module.exports = mongoose.model("Employee", employeeSchema);

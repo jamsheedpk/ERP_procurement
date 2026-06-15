@@ -6,7 +6,7 @@ router.get("/", async (req, res) => {
   try {
     const filter = {};
     if (req.query.empId) filter.empId = req.query.empId;
-    const docs = await Note.find(filter).sort({ createdAt: -1 });
+    const docs = await Note.find(filter).sort({ createdAt: -1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

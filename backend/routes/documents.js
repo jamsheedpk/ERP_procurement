@@ -29,7 +29,7 @@ router.get("/", async (req, res) => {
     if (req.query.empId)    filter.empId    = req.query.empId;
     if (req.query.status)   filter.status   = req.query.status;
     if (req.query.search)   filter.title    = { $regex: req.query.search, $options: "i" };
-    const docs = await Document.find(filter).sort({ createdAt: -1 });
+    const docs = await Document.find(filter).sort({ createdAt: -1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

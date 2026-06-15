@@ -4,14 +4,14 @@ const PayrollRun = require("../models/PayrollRun");
 
 router.get("/", async (req, res) => {
   try {
-    const docs = await PayrollRun.find().sort({ createdAt: -1 });
+    const docs = await PayrollRun.find().sort({ createdAt: -1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.get("/latest", async (req, res) => {
   try {
-    const doc = await PayrollRun.findOne().sort({ createdAt: -1 });
+    const doc = await PayrollRun.findOne().sort({ createdAt: -1 }).lean();
     if (!doc) return res.status(404).json({ error: "No payroll run found" });
     res.json(doc);
   } catch (err) { res.status(500).json({ error: err.message }); }

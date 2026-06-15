@@ -9,7 +9,7 @@ router.get("/", async (req, res) => {
     const filter = {};
     if (dept)   filter.dept   = dept;
     if (status) filter.status = status;
-    const docs = await Opening.find(filter).sort({ createdAt: -1 });
+    const docs = await Opening.find(filter).sort({ createdAt: -1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

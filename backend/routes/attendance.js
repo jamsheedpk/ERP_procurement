@@ -106,7 +106,7 @@ router.post("/init-day", async (req, res) => {
       }));
       await AttendanceRecord.bulkWrite(ops);
     }
-    const records = await AttendanceRecord.find({ date }).sort({ name: 1 });
+    const records = await AttendanceRecord.find({ date }).sort({ name: 1 }).lean();
     res.json(records);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -121,7 +121,7 @@ router.get("/records", async (req, res) => {
     if (date)   filter.date   = date;
     if (dept)   filter.dept   = dept;
     if (status) filter.status = status;
-    const docs = await AttendanceRecord.find(filter).sort({ name: 1 });
+    const docs = await AttendanceRecord.find(filter).sort({ name: 1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -175,7 +175,7 @@ router.delete("/records/:recordId", async (req, res) => {
 // GET /api/attendance  — list all AttendanceDay docs (legacy)
 router.get("/", async (req, res) => {
   try {
-    const docs = await AttendanceDay.find().sort({ date: -1 });
+    const docs = await AttendanceDay.find().sort({ date: -1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

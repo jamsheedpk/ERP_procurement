@@ -4,7 +4,7 @@ const Department = require("../models/Department");
 
 router.get("/", async (req, res) => {
   try {
-    const docs = await Department.find().sort({ name: 1 });
+    const docs = await Department.find().sort({ name: 1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

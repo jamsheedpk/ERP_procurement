@@ -9,7 +9,7 @@ router.get("/", async (req, res) => {
     const filter = {};
     if (from && to) filter.date = { $gte: from, $lte: to };
     else if (from) filter.date = { $gte: from };
-    const docs = await Shift.find(filter).sort({ dept: 1, empName: 1, date: 1 });
+    const docs = await Shift.find(filter).sort({ dept: 1, empName: 1, date: 1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

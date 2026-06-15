@@ -40,4 +40,7 @@ const projectSchema = new mongoose.Schema({
   notes:              { type: String, default: "" },
 }, { timestamps: true });
 
+projectSchema.index({ stage: 1, createdAt: -1 });
+projectSchema.index({ assignedTo: 1 });
+
 module.exports = mongoose.model("Project", projectSchema);

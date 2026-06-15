@@ -46,4 +46,6 @@ const quotationSchema = new mongoose.Schema({
   notes:         { type: String, default: "" },
 }, { timestamps: true });
 
+quotationSchema.index({ status: 1, createdAt: -1 });
+
 module.exports = mongoose.model("Quotation", quotationSchema);

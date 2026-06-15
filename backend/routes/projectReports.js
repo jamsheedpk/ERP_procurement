@@ -26,11 +26,11 @@ const Invoice  = require("../models/Invoice");
 router.get("/project-pnl", async (req, res) => {
   try {
     const [projects, expenses, cashbook, daybook, invoices] = await Promise.all([
-      Project.find({}).sort({ createdAt: -1 }),
-      Expense.find({}),
-      CashBook.find({}),
-      DayBook.find({}),
-      Invoice.find({}),
+      Project.find({}).sort({ createdAt: -1 }).lean(),
+      Expense.find({}).lean(),
+      CashBook.find({}).lean(),
+      DayBook.find({}).lean(),
+      Invoice.find({}).lean(),
     ]);
 
     // Seed a row for every project
@@ -172,10 +172,10 @@ router.get("/project-pnl/:projectId", async (req, res) => {
     const pid = req.params.projectId;
     const [project, expenses, cashbook, daybook, invoices] = await Promise.all([
       Project.findOne({ projectId: pid }),
-      Expense.find({ projectId: pid }),
-      CashBook.find({ projectId: pid }),
-      DayBook.find({ projectId: pid }),
-      Invoice.find({ projectId: pid }),
+      Expense.find({ projectId: pid }).lean(),
+      CashBook.find({ projectId: pid }).lean(),
+      DayBook.find({ projectId: pid }).lean(),
+      Invoice.find({ projectId: pid }).lean(),
     ]);
 
     const transactions = [];

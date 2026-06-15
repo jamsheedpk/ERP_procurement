@@ -5,7 +5,7 @@ const Activity = require("../models/Activity");
 router.get("/", async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 20;
-    const docs = await Activity.find().sort({ createdAt: -1 }).limit(limit);
+    const docs = await Activity.find().sort({ createdAt: -1 }).limit(limit).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

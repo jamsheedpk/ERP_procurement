@@ -7,7 +7,7 @@ router.get("/", async (req, res) => {
     const { severity } = req.query;
     const filter = {};
     if (severity) filter.severity = severity;
-    const docs = await Renewal.find(filter).sort({ days: 1 });
+    const docs = await Renewal.find(filter).sort({ days: 1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

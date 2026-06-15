@@ -4,7 +4,7 @@ const HeadcountSnapshot  = require("../models/HeadcountSnapshot");
 
 router.get("/trend", async (req, res) => {
   try {
-    const docs = await HeadcountSnapshot.find().sort({ order: 1 });
+    const docs = await HeadcountSnapshot.find().sort({ order: 1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

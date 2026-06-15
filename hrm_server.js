@@ -49,8 +49,9 @@ app.use("/api/documents",       adminOnly, require("./backend/routes/documents")
 // same paths: /api/parties, /api/cashbook, /api/daybook, /api/expenses.
 app.use("/api",                 adminOnly, require("./backend/modules/finance"));
 app.use("/api/procurement",     adminOnly, require("./backend/routes/procurement"));
-app.use("/api/quotations",      adminOnly, require("./backend/routes/quotations"));
-app.use("/api/invoices",        adminOnly, require("./backend/routes/invoices"));
+app.use("/api/quotations",           adminOnly, require("./backend/routes/quotations"));
+app.use("/api/payment-applications", adminOnly, require("./backend/routes/paymentApplications"));
+app.use("/api/invoices",             adminOnly, require("./backend/routes/invoices"));
 app.use("/api/reports",         adminOnly, require("./backend/routes/projectReports"));
 app.use("/api/review-cycles",   adminOnly, require("./backend/routes/reviewCycles"));
 app.use("/api/appraisals",      adminOnly, require("./backend/routes/appraisals"));

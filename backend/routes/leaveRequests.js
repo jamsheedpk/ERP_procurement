@@ -8,7 +8,7 @@ router.get("/", async (req, res) => {
     const filter = {};
     if (status) filter.status = status;
     if (empId)  filter.empId  = empId;
-    const docs = await LeaveRequest.find(filter).sort({ createdAt: -1 });
+    const docs = await LeaveRequest.find(filter).sort({ createdAt: -1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

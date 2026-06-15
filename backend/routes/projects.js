@@ -34,7 +34,7 @@ router.get("/", async (req, res) => {
         { location:  { $regex: req.query.search, $options: "i" } },
       ];
     }
-    const docs = await Project.find(filter).sort({ createdAt: -1 });
+    const docs = await Project.find(filter).sort({ createdAt: -1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

@@ -44,4 +44,7 @@ const invoiceSchema = new mongoose.Schema({
   status:        { type: String, enum: ["unpaid","partial","paid","overdue","cancelled"], default: "unpaid" },
 }, { timestamps: true });
 
+invoiceSchema.index({ status: 1, createdAt: -1 });
+invoiceSchema.index({ dueDate: 1, status: 1 });
+
 module.exports = mongoose.model("Invoice", invoiceSchema);

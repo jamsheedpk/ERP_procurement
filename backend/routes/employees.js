@@ -9,7 +9,7 @@ router.get("/", async (req, res) => {
     if (dept)   filter.deptId = dept;
     if (status) filter.status = status;
     if (search) filter.name = { $regex: search, $options: "i" };
-    const docs = await Employee.find(filter).sort({ name: 1 });
+    const docs = await Employee.find(filter).sort({ name: 1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

@@ -7,7 +7,7 @@ router.get("/", async (req, res) => {
   try {
     const filter = {};
     if (req.query.cycleId) filter.cycleId = req.query.cycleId;
-    const docs = await Appraisal.find(filter).sort({ dept: 1, empName: 1 });
+    const docs = await Appraisal.find(filter).sort({ dept: 1, empName: 1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

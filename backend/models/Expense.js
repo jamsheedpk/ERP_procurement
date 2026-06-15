@@ -25,4 +25,7 @@ const expenseSchema = new mongoose.Schema({
   }],
 }, { timestamps: true });
 
+expenseSchema.index({ status: 1, createdAt: -1 });
+expenseSchema.index({ empId: 1, createdAt: -1 });
+
 module.exports = mongoose.model("Expense", expenseSchema);

@@ -15,4 +15,6 @@ const dayBookSchema = new mongoose.Schema({
   notes:       { type: String, default: "" },
 }, { timestamps: true });
 
+dayBookSchema.index({ date: -1 });
+
 module.exports = mongoose.model("DayBook", dayBookSchema);

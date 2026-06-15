@@ -106,7 +106,7 @@ function AdminApp() {
 
 // Employees never see the admin HR pages — just their own self-service portal.
 function EmployeeApp() {
-  return <div className="hr-shell"><div className="hr-content"><PortalRoute /></div></div>;
+  return <PortalRoute />;
 }
 
 export default function App() {

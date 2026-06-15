@@ -4,7 +4,7 @@ const ReviewCycle = require("../models/ReviewCycle");
 
 router.get("/", async (req, res) => {
   try {
-    const docs = await ReviewCycle.find().sort({ createdAt: -1 });
+    const docs = await ReviewCycle.find().sort({ createdAt: -1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

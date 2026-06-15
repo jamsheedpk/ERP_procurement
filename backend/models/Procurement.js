@@ -165,6 +165,9 @@ const procurementSchema = new mongoose.Schema({
   history: [historySchema],
 }, { timestamps: true });
 
+procurementSchema.index({ status: 1, createdAt: -1 });
+procurementSchema.index({ currentStage: 1 });
+
 module.exports = mongoose.model("Procurement", procurementSchema);
 module.exports.PROC_STAGES = PROC_STAGES;
 module.exports.STAGE_KEYS  = STAGE_KEYS;

@@ -1,7 +1,7 @@
 import React from "react";
 import { Icon, Avatar, Chip, Button } from "../legacy.jsx";
 import { API_BASE as API } from "@meridian/api";
-const { useState: useStateP, useEffect: useEffectP, useMemo: useMemoP } = React;
+const { useState: useStateP, useEffect: useEffectP, useMemo: useMemoP, useRef: useRefP } = React;
 
 const ROLE_DEFS = [
   {
@@ -63,23 +63,115 @@ const MODULES = [
   { id: "settings",    label: "Settings",    icon: "settings" },
 ];
 
-const PERM_LABELS = { full: "Full", view: "View", self: "Self", none: "—" };
-const PERM_COLORS = {
-  full: { bg: "#D1FAE5", fg: "#065F46" },
-  view: { bg: "#DBEAFE", fg: "#1D4ED8" },
-  self: { bg: "#FEF3C7", fg: "#92400E" },
-  none: { bg: "transparent", fg: "var(--fg-4)" },
+const PERM_META = {
+  full: { label: "Full",  icon: "check-circle-2", bg: "#D1FAE5", fg: "#065F46", title: "Full access — can create, edit and delete" },
+  view: { label: "View",  icon: "eye",            bg: "#DBEAFE", fg: "#1D4ED8", title: "Read-only access" },
+  self: { label: "Self",  icon: "user",           bg: "#FEF3C7", fg: "#92400E", title: "Own records only" },
+  none: { label: "None",  icon: "x-circle",       bg: "#F3F4F6", fg: "#9CA3AF", title: "No access" },
 };
 
+function permLevel(p) { return { full: 3, view: 2, self: 1, none: 0 }[p] || 0; }
+function fullCount(role) { return MODULES.filter(m => role.perms[m.id] === "full").length; }
+
+/* Inline role selector — auto-saves on change */
+function RoleSelect({ user, onSave, saving }) {
+  const ref = useRefP(null);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <select
+        ref={ref}
+        defaultValue={user.role}
+        disabled={saving}
+        onChange={e => onSave(user.id, e.target.value)}
+        style={{
+          height: 30, fontSize: 12.5, padding: "0 28px 0 10px", borderRadius: 7,
+          border: "1px solid var(--border-subtle)", background: "var(--bg-surface)",
+          color: "var(--fg-1)", fontFamily: "var(--font-sans)", cursor: "pointer",
+          appearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+          backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center",
+        }}
+      >
+        {ROLE_DEFS.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+      </select>
+      {saving && <span style={{ fontSize: 11, color: "var(--fg-3)" }}>Saving…</span>}
+    </div>
+  );
+}
+
+/* Permission badge cell for the matrix */
+function PermCell({ perm, showLabel }) {
+  const m = PERM_META[perm] || PERM_META.none;
+  return (
+    <span title={m.title} style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: showLabel ? "3px 10px" : "5px",
+      borderRadius: 999, background: m.bg, color: m.fg,
+      fontSize: 11, fontWeight: 700, cursor: "default",
+    }}>
+      <Icon name={m.icon} size={12} />
+      {showLabel && m.label}
+    </span>
+  );
+}
+
+/* Single role detail panel */
+function RolePanel({ role, onClose }) {
+  const full = fullCount(role);
+  return (
+    <div className="card perm-role-panel" style={{ marginBottom: 20, borderTop: `3px solid ${role.color}` }}>
+      <div className="card-head">
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: role.color + "18", color: role.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Icon name={role.icon} size={20} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--fg-1)" }}>{role.name}</div>
+          <div style={{ fontSize: 12.5, color: "var(--fg-3)", marginTop: 2 }}>{role.desc}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 12, color: role.color, fontWeight: 600, background: role.color + "12", padding: "4px 10px", borderRadius: 999 }}>
+            {full}/{MODULES.length} full access
+          </span>
+          <button className="icon-btn" onClick={onClose}><Icon name="x" size={16} /></button>
+        </div>
+      </div>
+      <div style={{ padding: "0 20px 20px", display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
+        {MODULES.map(mod => {
+          const perm = role.perms[mod.id] || "none";
+          const m = PERM_META[perm];
+          const isNone = perm === "none";
+          return (
+            <div key={mod.id} style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
+              borderRadius: 10, border: `1px solid ${isNone ? "var(--border-subtle)" : m.bg}`,
+              background: isNone ? "var(--bg-surface)" : m.bg + "80",
+              opacity: isNone ? 0.55 : 1,
+            }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: isNone ? "var(--ink-100)" : m.fg + "18", color: isNone ? "var(--fg-4)" : m.fg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Icon name={mod.icon} size={15} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: isNone ? "var(--fg-3)" : "var(--fg-1)" }}>{mod.label}</div>
+                <div style={{ fontSize: 11, color: m.fg, fontWeight: 700, marginTop: 1, display: "flex", alignItems: "center", gap: 4 }}>
+                  <Icon name={m.icon} size={10} /> {m.label}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function PermissionsPage() {
-  const [users,    setUsers]    = useStateP([]);
-  const [loading,  setLoading]  = useStateP(true);
+  const [users,      setUsers]      = useStateP([]);
+  const [loading,    setLoading]    = useStateP(true);
   const [activeRole, setActiveRole] = useStateP(null);
-  const [editUser,   setEditUser]   = useStateP(null);
-  const [saving,     setSaving]     = useStateP(false);
+  const [savingId,   setSavingId]   = useStateP(null);
   const [search,     setSearch]     = useStateP("");
+  const [roleFilter, setRoleFilter] = useStateP("all");
   const [page,       setPage]       = useStateP(1);
-  const [pageSize,   setPageSize]   = useStateP(10);
+  const PAGE_SIZE = 10;
 
   useEffectP(() => {
     fetch(`${API}/auth/users`)
@@ -87,6 +179,13 @@ function PermissionsPage() {
       .then(data => { setUsers(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
+
+  const stats = useMemoP(() => ({
+    total:     users.length,
+    active:    users.filter(u => u.active !== false).length,
+    admins:    users.filter(u => u.userRole === "admin").length,
+    employees: users.filter(u => u.userRole === "employee").length,
+  }), [users]);
 
   const roleCounts = useMemoP(() => {
     const m = {};
@@ -96,29 +195,31 @@ function PermissionsPage() {
 
   const filtered = useMemoP(() => {
     const q = search.toLowerCase();
-    return users.filter(u =>
-      !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.role.toLowerCase().includes(q)
-    );
-  }, [users, search]);
+    return users.filter(u => {
+      const matchQ = !q || u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.role?.toLowerCase().includes(q);
+      const matchR = roleFilter === "all" || u.userRole === roleFilter;
+      return matchQ && matchR;
+    });
+  }, [users, search, roleFilter]);
 
-  useEffectP(() => { setPage(1); }, [search, pageSize]);
+  useEffectP(() => { setPage(1); }, [search, roleFilter]);
 
-  const totalPages  = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safePage    = Math.min(page, totalPages);
-  const start       = (safePage - 1) * pageSize;
-  const pageRows    = filtered.slice(start, start + pageSize);
-  const navBtn      = (dis) => ({ width:30, height:30, borderRadius:7, border:"1px solid var(--border-subtle)", background:"var(--bg-surface)", cursor:dis?"default":"pointer", display:"flex", alignItems:"center", justifyContent:"center", opacity:dis?0.4:1 });
-  const pageButtons = useMemoP(() => {
-    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    const left  = Math.max(2, safePage - 2);
-    const right = Math.min(totalPages - 1, safePage + 2);
-    const r = [1];
-    if (left > 2) r.push("...");
-    for (let i = left; i <= right; i++) r.push(i);
-    if (right < totalPages - 1) r.push("...");
-    if (totalPages > 1) r.push(totalPages);
-    return r;
-  }, [totalPages, safePage]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage   = Math.min(page, totalPages);
+  const pageRows   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const handleSaveRole = async (userId, newRole) => {
+    setSavingId(userId);
+    try {
+      const res = await fetch(`${API}/auth/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: newRole }),
+      });
+      const updated = await res.json();
+      setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, role: updated.role } : u));
+    } catch (e) { console.error(e); } finally { setSavingId(null); }
+  };
 
   const handleToggleActive = async (user) => {
     try {
@@ -132,130 +233,130 @@ function PermissionsPage() {
     } catch (e) { console.error(e); }
   };
 
-  const handleSaveRole = async (userId, newRole) => {
-    setSaving(true);
-    try {
-      const res = await fetch(`${API}/auth/users/${userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: newRole }),
-      });
-      const updated = await res.json();
-      setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, role: updated.role } : u));
-      setEditUser(null);
-    } catch (e) { console.error(e); } finally { setSaving(false); }
-  };
-
-  const displayedRole = activeRole
-    ? ROLE_DEFS.find(r => r.id === activeRole)
-    : null;
+  const displayedRole = activeRole ? ROLE_DEFS.find(r => r.id === activeRole) : null;
 
   return (
     <div className="page">
+      {/* Header */}
       <div className="page-head">
         <div>
           <div className="eyebrow">Settings · Access control</div>
           <h1 className="page-title">Permissions &amp; Roles</h1>
-          <div className="page-sub">{users.length} system users · {ROLE_DEFS.length} role definitions · manage who can see and do what</div>
+          <div className="page-sub">Manage who can see and do what across Meridian ERP</div>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          <Button variant="secondary" icon="download">Export users</Button>
+          <Button variant="secondary" icon="download">Export</Button>
           <Button variant="primary" icon="user-plus">Invite user</Button>
         </div>
       </div>
 
-      {/* Role cards strip */}
-      <div className="perm-role-strip" style={{ marginBottom: 22 }}>
-        {ROLE_DEFS.map(r => {
-          const cnt = roleCounts[r.name] || 0;
-          const isActive = activeRole === r.id;
-          return (
-            <div
-              key={r.id}
-              className={"card perm-role-card" + (isActive ? " perm-role-card--active" : "")}
-              style={{ borderTop: `3px solid ${r.color}`, cursor: "pointer", padding: "14px 16px" }}
-              onClick={() => setActiveRole(isActive ? null : r.id)}
-            >
-              <div className="perm-role-icon" style={{ background: r.color + "18", color: r.color }}>
-                <Icon name={r.icon} size={18} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--fg-1)" }}>{r.name}</div>
-                <div className="muted" style={{ fontSize: 11.5, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.desc}</div>
-              </div>
-              <div className="perm-role-count" style={{ color: r.color, background: r.color + "18" }}>
-                {cnt}
-              </div>
+      {/* KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "Total users",  value: stats.total,     icon: "users",      color: "#6F1947" },
+          { label: "Active",       value: stats.active,    icon: "check-circle-2", color: "#1F8A52" },
+          { label: "Admins",       value: stats.admins,    icon: "shield",     color: "#2563B0" },
+          { label: "Employees",    value: stats.employees, icon: "user",       color: "#A89DA3" },
+        ].map(s => (
+          <div key={s.label} className="card" style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: s.color + "18", color: s.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Icon name={s.icon} size={18} />
             </div>
-          );
-        })}
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 760, color: "var(--fg-1)", letterSpacing: "-0.03em" }}>{s.value}</div>
+              <div style={{ fontSize: 11.5, color: "var(--fg-3)", fontWeight: 500 }}>{s.label}</div>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Permission matrix — shown when a role card is clicked */}
-      {displayedRole && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div className="card-head">
-            <div className="perm-role-icon" style={{ background: displayedRole.color + "18", color: displayedRole.color }}>
-              <Icon name={displayedRole.icon} size={18} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div className="card-title-lg">{displayedRole.name} — permission matrix</div>
-              <div className="card-sub">{displayedRole.desc}</div>
-            </div>
-            <button className="icon-btn" onClick={() => setActiveRole(null)}><Icon name="x" size={16} /></button>
-          </div>
-          <div className="card-pad" style={{ paddingTop: 0 }}>
-            <div className="perm-matrix">
-              {MODULES.map(mod => {
-                const perm = displayedRole.perms[mod.id] || "none";
-                const col = PERM_COLORS[perm];
-                return (
-                  <div key={mod.id} className="perm-matrix-row">
-                    <div className="perm-matrix-mod">
-                      <Icon name={mod.icon} size={14} color="var(--fg-3)" />
-                      <span>{mod.label}</span>
-                    </div>
-                    <span className="perm-matrix-badge" style={{ background: col.bg, color: col.fg }}>
-                      {PERM_LABELS[perm]}
-                    </span>
-                    <div className="perm-matrix-bar">
-                      <div style={{
-                        height: "100%",
-                        width: perm === "full" ? "100%" : perm === "view" ? "60%" : perm === "self" ? "30%" : "0%",
-                        background: col.fg === "var(--fg-4)" ? "var(--ink-200)" : displayedRole.color,
-                        borderRadius: 3,
-                        opacity: 0.35,
-                        transition: "width 0.3s",
-                      }} />
+      {/* Role cards */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--fg-3)", marginBottom: 10 }}>
+          Roles — click to inspect permissions
+        </div>
+        <div className="perm-role-strip">
+          {ROLE_DEFS.map(r => {
+            const cnt   = roleCounts[r.name] || 0;
+            const full  = fullCount(r);
+            const isActive = activeRole === r.id;
+            return (
+              <div
+                key={r.id}
+                className={"card perm-role-card" + (isActive ? " perm-role-card--active" : "")}
+                style={{ borderTop: `3px solid ${r.color}`, cursor: "pointer", padding: "16px 16px 14px" }}
+                onClick={() => setActiveRole(isActive ? null : r.id)}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
+                  <div className="perm-role-icon" style={{ background: r.color + "18", color: r.color }}>
+                    <Icon name={r.icon} size={17} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--fg-1)" }}>{r.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.desc}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", gap: 3 }}>
+                    {MODULES.map(m => {
+                      const perm = r.perms[m.id] || "none";
+                      const col  = PERM_META[perm];
+                      return (
+                        <div key={m.id} title={`${m.label}: ${col.label}`} style={{
+                          width: 8, height: 8, borderRadius: "50%",
+                          background: perm === "none" ? "var(--ink-200)" : col.fg,
+                          opacity: perm === "none" ? 0.4 : 1,
+                        }} />
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 10.5, color: "var(--fg-4)" }}>{full}/{MODULES.length} full</span>
+                    <div className="perm-role-count" style={{ color: r.color, background: r.color + "18", width: 26, height: 26, fontSize: 13, borderRadius: 7 }}>
+                      {cnt}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Role detail panel */}
+      {displayedRole && (
+        <div style={{ marginTop: 16 }}>
+          <RolePanel role={displayedRole} onClose={() => setActiveRole(null)} />
         </div>
       )}
 
-      {/* Full permission matrix comparison */}
+      {/* Full permission comparison matrix */}
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="card-head">
           <div>
-            <div className="card-title-lg">Full permission matrix</div>
+            <div className="card-title-lg">Permission matrix</div>
             <div className="card-sub">Compare access levels across all roles and modules</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {Object.entries(PERM_META).map(([key, m]) => (
+              <span key={key} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: m.fg, fontWeight: 600 }}>
+                <Icon name={m.icon} size={11} /> {m.label}
+              </span>
+            ))}
           </div>
         </div>
         <div style={{ overflowX: "auto" }}>
           <table className="tbl perm-full-matrix">
             <thead>
               <tr>
-                <th style={{ minWidth: 130 }}>Module</th>
+                <th style={{ minWidth: 140, textAlign: "left" }}>Module</th>
                 {ROLE_DEFS.map(r => (
-                  <th key={r.id} style={{ textAlign: "center", minWidth: 100 }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 7, background: r.color + "18", color: r.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <th key={r.id} style={{ textAlign: "center", minWidth: 90 }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+                      <div style={{ width: 30, height: 30, borderRadius: 8, background: r.color + "18", color: r.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <Icon name={r.icon} size={13} />
                       </div>
-                      <span style={{ fontSize: 11, fontWeight: 600 }}>{r.name}</span>
+                      <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--fg-2)" }}>{r.name}</span>
                     </div>
                   </th>
                 ))}
@@ -265,19 +366,18 @@ function PermissionsPage() {
               {MODULES.map(mod => (
                 <tr key={mod.id}>
                   <td>
-                    <div className="row-tight" style={{ gap: 8 }}>
-                      <Icon name={mod.icon} size={14} color="var(--fg-3)" />
-                      <span style={{ fontWeight: 500, fontSize: 13 }}>{mod.label}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 7, background: "var(--ink-100)", color: "var(--fg-3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon name={mod.icon} size={13} />
+                      </div>
+                      <span style={{ fontWeight: 600, fontSize: 13, color: "var(--fg-1)" }}>{mod.label}</span>
                     </div>
                   </td>
                   {ROLE_DEFS.map(r => {
                     const perm = r.perms[mod.id] || "none";
-                    const col = PERM_COLORS[perm];
                     return (
                       <td key={r.id} style={{ textAlign: "center" }}>
-                        <span className="perm-matrix-badge" style={{ background: col.bg, color: col.fg }}>
-                          {PERM_LABELS[perm]}
-                        </span>
+                        <PermCell perm={perm} showLabel={false} />
                       </td>
                     );
                   })}
@@ -293,151 +393,150 @@ function PermissionsPage() {
         <div className="card-head">
           <div>
             <div className="card-title-lg">System users</div>
-            <div className="card-sub">{users.length} accounts · {users.filter(u => u.active).length} active · {users.filter(u => !u.active).length} deactivated</div>
+            <div className="card-sub">{stats.total} accounts · {stats.active} active</div>
           </div>
           <div className="row" style={{ gap: 8 }}>
-            <div className="search-wrap" style={{ position: "relative" }}>
-              <Icon name="search" size={14} color="var(--fg-4)" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
+            {/* Role filter tabs */}
+            <div style={{ display: "flex", gap: 4, background: "var(--ink-50)", borderRadius: 8, padding: 3 }}>
+              {[["all", "All"], ["admin", "Admin"], ["employee", "Employee"]].map(([val, lbl]) => (
+                <button key={val} onClick={() => setRoleFilter(val)} style={{
+                  padding: "4px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600,
+                  background: roleFilter === val ? "var(--bg-surface)" : "transparent",
+                  color: roleFilter === val ? "var(--fg-1)" : "var(--fg-3)",
+                  boxShadow: roleFilter === val ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                  fontFamily: "var(--font-sans)",
+                }}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            <div style={{ position: "relative" }}>
+              <Icon name="search" size={14} color="var(--fg-4)" style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
               <input
                 className="fi"
-                style={{ paddingLeft: 32, width: 200, height: 32, fontSize: 13 }}
+                style={{ paddingLeft: 30, width: 190, height: 32, fontSize: 13 }}
                 placeholder="Search users…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <Button variant="secondary" size="sm" icon="filter">Filter</Button>
           </div>
         </div>
+
         {loading ? (
-          <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--fg-3)" }}>
-            <Icon name="loader" size={24} color="var(--ink-300)" />
-            <div style={{ marginTop: 8, fontSize: 13 }}>Loading users…</div>
+          <div style={{ padding: "48px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, color: "var(--fg-3)" }}>
+            <div style={{ width: 32, height: 32, border: "3px solid var(--plum-100)", borderTopColor: "var(--brand-burgundy)", borderRadius: "50%", animation: "spin .8s linear infinite" }} />
+            <span style={{ fontSize: 13 }}>Loading users…</span>
           </div>
         ) : (
           <>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>System role</th>
-                <th>ERP role</th>
-                <th>Status</th>
-                <th>Member since</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map(u => {
-                const rd = ROLE_DEFS.find(r => r.name === u.role);
-                const isEditing = editUser === u.id;
-                return (
-                  <tr key={u.id} style={{ opacity: u.active ? 1 : 0.5 }}>
-                    <td>
-                      <div className="row" style={{ gap: 10, alignItems: "center" }}>
-                        <Avatar name={u.name} color={u.avatar} />
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 13.5 }}>{u.name}</div>
-                          <div className="muted" style={{ fontSize: 11.5 }}>{u.email}</div>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>System role</th>
+                  <th>ERP role</th>
+                  <th>Status</th>
+                  <th>Member since</th>
+                  <th style={{ textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map(u => {
+                  const rd = ROLE_DEFS.find(r => r.name === u.role);
+                  const isActive = u.active !== false;
+                  const isSaving = savingId === u.id;
+                  return (
+                    <tr key={u.id} style={{ opacity: isActive ? 1 : 0.55 }}>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{
+                            width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                            background: u.avatar?.bg || u.av?.bg || "#F4DDE8",
+                            color: u.avatar?.fg || u.av?.fg || "#6F1947",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 12.5, fontWeight: 700,
+                          }}>
+                            {(u.name || "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--fg-1)" }}>{u.name}</div>
+                            <div style={{ fontSize: 11.5, color: "var(--fg-3)" }}>{u.email}</div>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td>
-                      <Chip kind={u.userRole === "admin" ? "brand" : "default"} dot={false}>
-                        {u.userRole === "admin" ? "Admin" : "Employee"}
-                      </Chip>
-                    </td>
-                    <td>
-                      {isEditing ? (
-                        <div className="row-tight" style={{ gap: 6 }}>
-                          <select
-                            className="fi"
-                            defaultValue={u.role}
-                            id={"role-sel-" + u.id}
-                            style={{ height: 28, fontSize: 12, padding: "0 8px" }}
+                      </td>
+                      <td>
+                        <Chip kind={u.userRole === "admin" ? "brand" : "default"} dot={false}>
+                          {u.userRole === "admin" ? "Admin" : "Employee"}
+                        </Chip>
+                      </td>
+                      <td>
+                        <RoleSelect user={u} saving={isSaving} onSave={handleSaveRole} />
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: isActive ? "var(--success-500)" : "var(--ink-300)" }} />
+                          <span style={{ fontSize: 12.5, color: isActive ? "var(--success-700)" : "var(--fg-4)", fontWeight: 500 }}>
+                            {isActive ? "Active" : "Deactivated"}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ fontSize: 12.5, color: "var(--fg-3)", fontFamily: "var(--font-mono)" }}>
+                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+                          <button
+                            title={isActive ? "Deactivate user" : "Activate user"}
+                            className="icon-btn"
+                            style={{ color: isActive ? "var(--fg-3)" : "var(--success-700)" }}
+                            onClick={() => handleToggleActive(u)}
                           >
-                            {ROLE_DEFS.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
-                          </select>
-                          <button className="btn btn-primary" style={{ fontSize: 11, padding: "3px 10px", height: 28 }}
-                            disabled={saving}
-                            onClick={() => {
-                              const sel = document.getElementById("role-sel-" + u.id);
-                              handleSaveRole(u.id, sel.value);
-                            }}>
-                            {saving ? "…" : "Save"}
+                            <Icon name={isActive ? "user-x" : "user-check"} size={15} />
                           </button>
-                          <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 8px", height: 28 }} onClick={() => setEditUser(null)}>Cancel</button>
                         </div>
-                      ) : (
-                        <span className="perm-role-tag" style={rd ? { background: rd.color + "18", color: rd.color } : {}}>
-                          {rd && <Icon name={rd.icon} size={11} />}
-                          {u.role || "—"}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <span className={"perm-status-dot " + (u.active ? "active" : "inactive")} />
-                      <span style={{ fontSize: 12.5, color: u.active ? "var(--success-700)" : "var(--fg-4)" }}>
-                        {u.active ? "Active" : "Deactivated"}
-                      </span>
-                    </td>
-                    <td className="cell-mono">
-                      {u.createdAt ? new Date(u.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
-                    </td>
-                    <td>
-                      <div className="row-tight" style={{ gap: 6 }}>
-                        <button className="btn btn-ghost" style={{ fontSize: 11, padding: "3px 9px" }} onClick={() => setEditUser(isEditing ? null : u.id)}>
-                          <Icon name="edit-2" size={12} /> Role
-                        </button>
-                        <button
-                          className={"btn " + (u.active ? "btn-ghost" : "btn-secondary")}
-                          style={{ fontSize: 11, padding: "3px 9px" }}
-                          onClick={() => handleToggleActive(u)}
-                        >
-                          <Icon name={u.active ? "user-x" : "user-check"} size={12} />
-                          {u.active ? "Deactivate" : "Activate"}
-                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: "center", padding: "48px 20px" }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, color: "var(--fg-3)" }}>
+                        <Icon name="users" size={28} color="var(--ink-300)" />
+                        <span style={{ fontSize: 13 }}>No users match your search</span>
+                        {search && <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setSearch("")}>Clear search</button>}
                       </div>
                     </td>
                   </tr>
-                );
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: "40px 20px", color: "var(--fg-3)" }}>
-                    No users found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          {filtered.length > 0 && (
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 16px", borderTop:"1px solid var(--border-subtle)", flexWrap:"wrap", gap:8 }}>
-              <div style={{ fontSize:12.5, color:"var(--fg-3)" }}>
-                {start+1}–{Math.min(start+pageSize, filtered.length)} of {filtered.length} users
-              </div>
-              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:12, color:"var(--fg-3)" }}>Rows</span>
-                <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-                  style={{ height:28, fontSize:12, padding:"0 6px", borderRadius:6, border:"1px solid var(--border-subtle)", background:"var(--bg-surface)" }}>
-                  {[10,25,50,100].map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
-                <div style={{ display:"flex", gap:4 }}>
-                  <button onClick={() => setPage(1)} disabled={safePage===1} style={navBtn(safePage===1)}><span style={{fontSize:12}}>«</span></button>
-                  <button onClick={() => setPage(safePage-1)} disabled={safePage===1} style={navBtn(safePage===1)}><span style={{fontSize:12}}>‹</span></button>
-                  {pageButtons.map((b,i) => b==="..." ? (
-                    <span key={"e"+i} style={{width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"var(--fg-3)"}}>…</span>
-                  ) : (
-                    <button key={b} onClick={() => setPage(b)} style={{width:30,height:30,borderRadius:7,border:"1px solid var(--border-subtle)",cursor:"pointer",fontSize:12,fontWeight:b===safePage?700:400,background:b===safePage?"#2563B0":"var(--bg-surface)",color:b===safePage?"#fff":"var(--fg-1)"}}>
-                      {b}
+                )}
+              </tbody>
+            </table>
+
+            {/* Pagination */}
+            {filtered.length > PAGE_SIZE && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: "1px solid var(--border-subtle)" }}>
+                <span style={{ fontSize: 12.5, color: "var(--fg-3)" }}>
+                  {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} users
+                </span>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {[
+                    { icon: "chevrons-left",  action: () => setPage(1),           dis: safePage === 1 },
+                    { icon: "chevron-left",   action: () => setPage(p => p - 1),  dis: safePage === 1 },
+                    { icon: "chevron-right",  action: () => setPage(p => p + 1),  dis: safePage === totalPages },
+                    { icon: "chevrons-right", action: () => setPage(totalPages),   dis: safePage === totalPages },
+                  ].map((b, i) => (
+                    <button key={i} onClick={b.action} disabled={b.dis} style={{
+                      width: 30, height: 30, borderRadius: 7, border: "1px solid var(--border-subtle)",
+                      background: "var(--bg-surface)", cursor: b.dis ? "default" : "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center", opacity: b.dis ? 0.35 : 1,
+                    }}>
+                      <Icon name={b.icon} size={13} />
                     </button>
                   ))}
-                  <button onClick={() => setPage(safePage+1)} disabled={safePage===totalPages} style={navBtn(safePage===totalPages)}><span style={{fontSize:12}}>›</span></button>
-                  <button onClick={() => setPage(totalPages)} disabled={safePage===totalPages} style={navBtn(safePage===totalPages)}><span style={{fontSize:12}}>»</span></button>
                 </div>
               </div>
-            </div>
-          )}
+            )}
           </>
         )}
       </div>

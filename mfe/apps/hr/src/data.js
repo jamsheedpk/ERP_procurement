@@ -23,34 +23,57 @@ export function useHrData() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
+
+    // Phase 1 — 4 calls needed to render Employees/Leave/Recruitment immediately.
     Promise.all([
-      j("/employees"), j("/departments"), j("/leave-requests"), j("/openings"), j("/candidates"),
-      j("/payroll/latest"), j("/renewals"), j("/activity"), j("/leave-types"),
-      j("/attendance/today?date=2026-05-21"), j("/attendance/week?date=2026-05-21"),
-      j("/headcount/trend"), j("/calendar-events?month=2026-05"), j("/documents?status=pending_signature"),
-    ]).then(([employees, departments, leaveRequests, openings, candidates, payrollRun, renewals, activity, leaveTypes, attendanceToday, weekAttendance, headcountTrend, monthEvents, pendingDocs]) => {
+      j("/employees"), j("/departments"), j("/leave-requests"), j("/leave-types"),
+    ]).then(([employees, departments, leaveRequests, leaveTypes]) => {
+      if (cancelled) return;
       const emps  = employees.map((e) => ({ ...e, id: e.empId }));
       const depts = departments.map((d) => ({ ...d, id: d.deptId }));
       const lvs   = leaveRequests.map((l) => ({ ...l, id: l.leaveId }));
-      const jobs  = openings.map((o) => ({ ...o, id: o.jobId }));
-      const cands = candidates.map((c) => ({ ...c, id: c.candidateId }));
       const types = leaveTypes.map((t) => ({ ...t, id: t.typeId }));
-      setData({
-        employees: emps, departments: depts, leaveRequests: lvs, openings: jobs, candidates: cands,
-        payrollRun, renewals, activity, leaveTypes: types, attendanceToday, weekAttendance, headcountTrend,
-        monthEvents, pendingDocs: Array.isArray(pendingDocs) ? pendingDocs : [],
+      const base = {
+        employees: emps, departments: depts, leaveRequests: lvs, leaveTypes: types,
+        openings: [], candidates: [], payrollRun: {}, renewals: [], activity: [],
+        attendanceToday: [], weekAttendance: [], headcountTrend: [], monthEvents: [], pendingDocs: [],
         company: {
           name: "Meridian Logistics DMCC", short: "Meridian", headcount: emps.length,
           activeToday: emps.filter((e) => e.status === "active").length,
           onLeave: emps.filter((e) => e.status === "on-leave").length,
           pendingLeaves: lvs.filter((l) => l.status === "pending").length,
-          expiringDocs: renewals.filter((r) => r.severity === "danger" || r.severity === "warning").length,
-          openRoles: jobs.length, payrollDue: payrollRun.runDate || "—",
-          nextPayroll: payrollRun.gross ? "AED " + payrollRun.gross.toLocaleString() : "—",
+          expiringDocs: 0, openRoles: 0, payrollDue: "—", nextPayroll: "—",
         },
         today: TODAY, fmtDate: FMT_DATE,
-      });
-    }).catch((e) => setError(e.message || "Could not load HR data."));
+      };
+      setData(base);
+
+      // Phase 2 — remaining 10 calls; update data when they land.
+      Promise.all([
+        j("/openings"), j("/candidates"), j("/payroll/latest"), j("/renewals"), j("/activity"),
+        j("/attendance/today?date=2026-05-21"), j("/attendance/week?date=2026-05-21"),
+        j("/headcount/trend"), j("/calendar-events?month=2026-05"), j("/documents?status=pending_signature"),
+      ]).then(([openings, candidates, payrollRun, renewals, activity, attendanceToday, weekAttendance, headcountTrend, monthEvents, pendingDocs]) => {
+        if (cancelled) return;
+        const jobs  = openings.map((o) => ({ ...o, id: o.jobId }));
+        const cands = candidates.map((c) => ({ ...c, id: c.candidateId }));
+        setData((prev) => prev ? {
+          ...prev, openings: jobs, candidates: cands, payrollRun, renewals, activity,
+          attendanceToday, weekAttendance, headcountTrend,
+          monthEvents, pendingDocs: Array.isArray(pendingDocs) ? pendingDocs : [],
+          company: {
+            ...prev.company,
+            expiringDocs: renewals.filter((r) => r.severity === "danger" || r.severity === "warning").length,
+            openRoles: jobs.length,
+            payrollDue: payrollRun.runDate || "—",
+            nextPayroll: payrollRun.gross ? "AED " + payrollRun.gross.toLocaleString() : "—",
+          },
+        } : prev);
+      }).catch(() => { /* secondary data failure is non-fatal; keep what we have */ });
+    }).catch((e) => { if (!cancelled) setError(e.message || "Could not load HR data."); });
+
+    return () => { cancelled = true; };
   }, []);
 
   // Local optimistic mutations (mirror the monolith App handlers).

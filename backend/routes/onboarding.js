@@ -7,7 +7,7 @@ router.get("/", async (req, res) => {
   try {
     const filter = {};
     if (req.query.type) filter.type = req.query.type;
-    const docs = await Onboarding.find(filter).sort({ createdAt: -1 });
+    const docs = await Onboarding.find(filter).sort({ createdAt: -1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

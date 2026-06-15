@@ -4,7 +4,7 @@ const Benefit = require("../models/Benefit");
 
 router.get("/", async (req, res) => {
   try {
-    const docs = await Benefit.find().sort({ createdAt: 1 });
+    const docs = await Benefit.find().sort({ createdAt: 1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

@@ -7,7 +7,7 @@ router.get("/", async (req, res) => {
   try {
     const filter = {};
     if (req.query.cycleId) filter.cycleId = req.query.cycleId;
-    const docs = await OrgGoal.find(filter).sort({ createdAt: 1 });
+    const docs = await OrgGoal.find(filter).sort({ createdAt: 1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

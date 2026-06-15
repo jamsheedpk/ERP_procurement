@@ -16,4 +16,7 @@ const leaveRequestSchema = new mongoose.Schema({
   approver:  { type: String, default: "" },
 }, { timestamps: true });
 
+leaveRequestSchema.index({ status: 1, createdAt: -1 });
+leaveRequestSchema.index({ empId: 1, createdAt: -1 });
+
 module.exports = mongoose.model("LeaveRequest", leaveRequestSchema);

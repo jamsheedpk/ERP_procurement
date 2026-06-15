@@ -45,7 +45,7 @@ router.get("/", async function(req, res) {
         { projectName:  { $regex: req.query.search, $options: "i" } },
       ];
     }
-    var docs = await Invoice.find(filter).sort({ createdAt: -1 });
+    var docs = await Invoice.find(filter).sort({ createdAt: -1 }).lean();
     res.json(docs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

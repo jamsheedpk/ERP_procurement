@@ -8,7 +8,7 @@ router.get("/", async (req, res) => {
   try {
     const month = req.query.month;
     const filter = month ? { month } : {};
-    const docs = await CalendarEvent.find(filter).sort({ day: 1 });
+    const docs = await CalendarEvent.find(filter).sort({ day: 1 }).lean();
 
     // Group into { day: [events] } map for easy frontend consumption
     const map = {};
