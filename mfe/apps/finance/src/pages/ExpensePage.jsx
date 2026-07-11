@@ -702,7 +702,7 @@ function ExpensePage() {
       <div style={{ display: "grid", gridTemplateColumns: selected ? "1fr 320px" : "1fr 300px", gap: 20, alignItems: "start" }}>
 
         {/* ── Main section ────────────────────────────────────────────────── */}
-        <div>
+        <div style={{ minWidth: 0 }}>
           {/* Filters */}
           <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
             <div style={{ position: "relative", flex: 1, maxWidth: 280 }}>
@@ -729,7 +729,8 @@ function ExpensePage() {
           </div>
 
           <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-subtle)", background: "var(--ink-50)" }}>
                   {["Employee","Category","Description","Date","Amount","Payment","Rcpts","Status",""].map(h => (
@@ -856,6 +857,7 @@ function ExpensePage() {
                 })}
               </tbody>
             </table>
+            </div>
             {filtered.length === 0 && (
               <div style={{ padding: "40px 0", textAlign: "center", color: "var(--fg-3)" }}>
                 <Icon name="receipt" size={28} color="var(--fg-3)" />

@@ -25,12 +25,15 @@ const Invoice  = require("../models/Invoice");
 // will overstate cost (or income) for that project.
 router.get("/project-pnl", async (req, res) => {
   try {
+    const { year } = req.query;
+    const yearFilter = year ? { date: { $regex: `^${year}-` } } : {};
+
     const [projects, expenses, cashbook, daybook, invoices] = await Promise.all([
       Project.find({}).sort({ createdAt: -1 }).lean(),
-      Expense.find({}).lean(),
-      CashBook.find({}).lean(),
-      DayBook.find({}).lean(),
-      Invoice.find({}).lean(),
+      Expense.find(yearFilter).lean(),
+      CashBook.find(yearFilter).lean(),
+      DayBook.find(yearFilter).lean(),
+      Invoice.find(yearFilter).lean(),
     ]);
 
     // Seed a row for every project

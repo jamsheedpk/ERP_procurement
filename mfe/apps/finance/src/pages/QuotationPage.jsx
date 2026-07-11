@@ -727,6 +727,9 @@ function QuotationFormModal(props) {
 
   var isEdit = !!(initial.quotationId);
 
+  var hasLineItem = items.some(function(it) { return (it.description || "").trim(); });
+  var valid = clientName.trim() && hasLineItem;
+
   return (
     <div className="modal-overlay" onClick={function(e) { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" style={{ maxWidth: 740, width: "100%", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
@@ -808,7 +811,7 @@ function QuotationFormModal(props) {
 
               <div className="form-row">
                 <div>
-                  <label className="form-label">Client Name</label>
+                  <label className="form-label">Client Name *</label>
                   <input className="form-input" value={clientName} placeholder="Client / Company name" onChange={function(e) { setClientName(e.target.value); }} />
                 </div>
                 <div>
@@ -930,7 +933,8 @@ function QuotationFormModal(props) {
                 Next: Scope & Items <Icon name="arrow-right" size={14} />
               </button>
             ) : (
-              <button className="btn btn-primary" type="button" onClick={handleSave}>
+              <button className="btn btn-primary" type="button" onClick={handleSave} disabled={!valid}
+                title={valid ? "" : "Add a client name and at least one line item"}>
                 <Icon name="save" size={14} /> {isEdit ? "Save Changes" : "Create Quotation"}
               </button>
             )}
